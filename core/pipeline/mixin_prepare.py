@@ -1,0 +1,39 @@
+import numpy as np
+from typing import Dict
+from .meta import ModelConfig
+import cv2
+
+clahe = cv2.createCLAHE(
+    clipLimit=3.0,       # 对比度限制
+    tileGridSize=(8,8)   # 分块大小
+)
+
+class PrepareMixin():
+    def prepare(self, images: Dict[str, np.ndarray], modelConfig: ModelConfig) -> None:
+        for v, image in images.items():
+            # 空图片
+            if image is None: continue
+
+            h, w = image.shape[:2]
+            rectification = modelConfig.rectification.get(v)
+            top_lower, top_upper, bottom_lower, bottom_upper = rectification
+            if rectification == (0, 1, 0, 1): continue
+
+            # 透视变换
+            # 原图上的四个点 (顺序很重要：左上, 右上, 左下, 右下)
+            pts1 = np.float32([[top_lower * w, 0], [top_upper * w, 0],
+                               [bottom_lower * w, h], [bottom_upper * w, h]])
+            # 变换后的目标位置 (映射成一个规则矩形)
+            new_width = max(top_upper - top_lower, bottom_upper - bottom_lower) * w
+            pts2 = np.float32([[0, 0], [new_width, 0], [0, h], [new_width, h]])
+
+            # cv2.line(image, (int(top_lower * w), 0), (int(bottom_lower * w), h), (255, 0, 0), 2)
+            # cv2.line(image, (int(bottom_lower * w), 0), (int(bottom_upper * w), h), (255, 0, 0), 2)
+            # cv2.imwrite('results.jpg', image)
+            # 计算透视变换矩阵
+            M = cv2.getPerspectiveTransform(pts1, pts2)
+            # 应用透视变换
+            dst = cv2.warpPerspective(image, M, (int(new_width), h))
+            # 直方图均衡
+            enhanced = clahe.apply(dst)
+            images[v] = enhanced[int(h/3):int(2*h/3)]

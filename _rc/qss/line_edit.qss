@@ -1,0 +1,10 @@
+QLineEdit {
+    border: 2px solid #E1E1E1;
+    border-radius: 6px;
+    padding: 2px;
+    background-color: white;
+}
+QLineEdit:focus {
+    border-color: #0078D7;
+    background-color: #F5FBFF;
+}

@@ -1,0 +1,32 @@
+QListWidget, QListView, QTreeView {
+    border: none;
+    border-radius: 8px;
+    background-color: white;
+    padding: 4px;
+
+    /* 取消整体焦点虚线 */
+    outline: none;
+}
+
+QListWidget::item,
+QListView::item,
+QTreeView::item {
+    padding: 8px;
+    border-radius: 4px;
+}
+
+/* 选中状态（更淡蓝） */
+QListWidget::item:selected,
+QListView::item:selected,
+QTreeView::item:selected {
+    background-color: #D6EBFF;   /* 更淡蓝 */
+    color: black;                /* 文字不要白色，更柔和 */
+    outline: none;               /* 去虚线框 */
+}
+
+/* 鼠标悬停 */
+QListWidget::item:hover,
+QListView::item:hover,
+QTreeView::item:hover {
+    background-color: #F2F8FF;   /* 更浅 */
+}
