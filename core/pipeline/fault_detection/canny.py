@@ -65,6 +65,7 @@ def _jit_weighted_canny(gray, low_thresh=50, high_thresh=150) -> Output:
     mean = np.mean(gray, axis=0)
     _residual = _jit_get_residual(gray=gray, mean=mean[np.newaxis])
     residual = _jit_uniform(numba_jit.abs(_residual))
+
     for _ in range(1):
         # residual = cv2.dilate(residual, np.ones((7, 7), np.uint8), iterations=1)
         # residual = cv2.erode(residual, np.ones((7, 7), np.uint8), iterations=1)
@@ -77,6 +78,7 @@ def _jit_weighted_canny(gray, low_thresh=50, high_thresh=150) -> Output:
         # residual
         # print(np.bincount(residual.flatten()))
         # print(np.where(residual == 255,))
+
 
     # cv2.imwrite('cache/gx.jpg', gx)
     # cv2.imwrite('cache/gy.jpg', gy)

@@ -51,6 +51,7 @@ class DetectionInterface(QWidget):
 
         # 分割
         self.splitter = QSplitter(self)
+        self.splitter.setContentsMargins(0,0,0,0)
 
     def initConnect(self):
         pass

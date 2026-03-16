@@ -53,7 +53,7 @@ def detect(img: np.ndarray) -> List[DetectOutput]:
     # height and width
     scale = 0.5
     gray = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
-    height, width = img.shape[:2]
+    height, width = gray.shape[:2]
 
     # 裁剪出需要识别的区域
     #crop_output = crop_detect_area(gray)
@@ -63,8 +63,10 @@ def detect(img: np.ndarray) -> List[DetectOutput]:
     # 提取特征
     canny_output = weighted_canny(gray, low_thresh=60, high_thresh=110)
 
+
     # 腐蚀膨胀
     feature = cv2.bitwise_or(canny_output.processed_residual, canny_output.processed_gxy)
+
 
     # for _ in range(1):
     #     feature = cv2.dilate(feature, np.ones((32, 24), np.uint8), iterations=1)
@@ -72,13 +74,28 @@ def detect(img: np.ndarray) -> List[DetectOutput]:
 
     # 找轮廓(可能的缺陷)
     _, binary = cv2.threshold(feature, 100, 255, cv2.THRESH_BINARY)
+    binary = cv2.dilate(binary, np.ones((3, 3), np.uint8), iterations=3)
+    #binary = cv2.erode(binary, np.ones((3, 3), np.uint8), iterations=3)
+
+    # while True:
+    #     cv2.imshow('feature', feature
+    #                )
+    #     cv2.imshow('binary', binary
+    #                )
+    #     cv2.waitKey(1)
+    # while True:
+    #     cv2.imshow('canny_output', feature)
+    #     cv2.imwrite('canny_output.png', feature)
+    #     cv2.waitKey(1)
     contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    print(contours)
     _contours = []
     for cnt in contours:
-        if cv2.contourArea(cnt) < 10: continue  # 过滤太小的色块
+        #if cv2.contourArea(cnt) < 0: continue  # 过滤太小的色块
         x, y, w, h = cv2.boundingRect(cnt)
-        if w < 10 or h < 10: continue
-        if h > height * 0.8: continue
+        # if w < width * 0.01 or h < height * 0.01: continue
+        if h > height * 0.5: continue
         _contours.append(cnt)
 
     # 进一步分析是否是缺陷
