@@ -48,19 +48,25 @@ def visualize_detect(image, outputs):
 
     return img
 if __name__ == '__main__':
+    path = r'cache/dataset'
     # dataset()
+    files =os.listdir(path)
+    #files = ['7.jpg']
+    #files = ['104.jpg']
+    #image = Image.open(os.path.join(path,)'cache/dataset/115.jpg')
+    #image = np.array(image)
 
-    image = Image.open('cache/dataset/115.jpg')
-    image = np.array(image)
-    print(image.shape)
 
 
+    for file in files:
+        print(file)
+        image = Image.open(os.path.join(path, file))
+        image = np.array(image)
+        outputs = detect(image)
 
-    outputs = detect(image)
+        vis = visualize_detect(image, outputs)
 
-    vis = visualize_detect(image, outputs)
-
-    cv2.imshow("result", vis)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+        cv2.imshow("result", vis)
+        key = cv2.waitKey(0)
+        cv2.destroyAllWindows()
 

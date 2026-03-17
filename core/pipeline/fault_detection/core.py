@@ -66,34 +66,84 @@ def detect(img: np.ndarray) -> List[DetectOutput]:
 
     # 腐蚀膨胀
     feature = cv2.bitwise_or(canny_output.processed_residual, canny_output.processed_gxy)
+    # cv2.imshow('feature', gray)
+
+    for _ in range(10):
+        feature = cv2.erode(feature, np.ones((3, 3), np.uint8), iterations=1)
+        feature = cv2.dilate(feature, np.ones((3, 3), np.uint8), iterations=1)
+        #     feature = cv2.erode(feature, np.ones((32, 24), np.uint8), iterations=1)
+    print(feature.shape)
+    # Step 1：去背景（保留局部差异）
+    # bg = cv2.GaussianBlur(feature, (1, 1), 0)
+    # feature = cv2.subtract(bg, feature)
+
+    clahe = cv2.createCLAHE(2.0, (8, 8))
+
+    # params = cv2.SimpleBlobDetector_Params()
+    # # 设置阈值范围
+    # params.minThreshold = 0
+    # params.maxThreshold = 255
+    # # 按面积筛选
+    # params.filterByArea = False
+    # params.minArea = 50
+    # # 按圆度筛选
+    # params.filterByCircularity = False
+    # # 创建检测器
+    # detector = cv2.SimpleBlobDetector_create(params)
+    # # 检测
+    # keypoints = detector.detect(feature)
+    # print(keypoints)
+    # 绘制
+    # out = cv2.drawKeypoints(feature, keypoints, None, (0, 0, 255),
+    #                         cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+
+    #kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (21, 21))
+    #tophat = cv2.morphologyEx(feature, cv2.MORPH_TOPHAT, kernel)
+    # feature_f = feature.astype(np.float32)
+    # mean = cv2.blur(feature_f, (15, 15))
+    # sqmean = cv2.blur(feature_f ** 2, (15, 15))** 0.5
+    # std = np.sqrt(sqmean - mean ).astype(np.uint8)
 
 
-    # for _ in range(1):
-    #     feature = cv2.dilate(feature, np.ones((32, 24), np.uint8), iterations=1)
-    #     feature = cv2.erode(feature, np.ones((32, 24), np.uint8), iterations=1)
+    # cv2.imshow("blob", out)
+    # cv2.imshow("feature", feature)
+    # cv2.imshow("sqmean", sqmean.astype(np.uint8))
+    # cv2.imwrite("feature.jpg", feature)
+    # cv2.waitKey(0)
+    #
+    # feature = std
+    # feature = clahe.apply(feature)
+    # th2 = cv2.adaptiveThreshold(
+    #     feature,
+    #     255,
+    #     cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+    #     cv2.THRESH_BINARY,
+    #     11,
+    #     5
+    # )
+    # feature = th2
 
     # 找轮廓(可能的缺陷)
-    _, binary = cv2.threshold(feature, 100, 255, cv2.THRESH_BINARY)
+    _, binary = cv2.threshold(feature, 75, 255, cv2.THRESH_BINARY)
     binary = cv2.dilate(binary, np.ones((3, 3), np.uint8), iterations=3)
     #binary = cv2.erode(binary, np.ones((3, 3), np.uint8), iterations=3)
+    # cv2.imshow('feature', feature)
+    #
 
-    # while True:
-    #     cv2.imshow('feature', feature
-    #                )
-    #     cv2.imshow('binary', binary
-    #                )
-    #     cv2.waitKey(1)
     # while True:
     #     cv2.imshow('canny_output', feature)
     #     cv2.imwrite('canny_output.png', feature)
     #     cv2.waitKey(1)
     contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-    print(contours)
+    # print(contours)
     _contours = []
     for cnt in contours:
         #if cv2.contourArea(cnt) < 0: continue  # 过滤太小的色块
         x, y, w, h = cv2.boundingRect(cnt)
+        if x == 0 or x + w == width or y == 0 or y + h == height:
+            continue
+
         # if w < width * 0.01 or h < height * 0.01: continue
         if h > height * 0.5: continue
         _contours.append(cnt)
@@ -104,7 +154,7 @@ def detect(img: np.ndarray) -> List[DetectOutput]:
         anaylsis_output = anaylsis(cnt=cnt, img=gray,
                                    gxy=canny_output.gxy,
                                    residual=canny_output.residual,
-                                   threshold=150)
+                                   threshold=30)
         if not anaylsis_output.has_fault:
             continue
         x, y, w, h = cv2.boundingRect(cnt)
