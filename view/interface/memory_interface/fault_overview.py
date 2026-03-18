@@ -18,13 +18,11 @@ class BatchFaultOverview(FaultOverview):
     def load(self, path):
         self.clear()
         minimum, maximum = None, None
-        print("go")
         for i in os.listdir(path):
             _f = tuple(os.listdir(os.path.join(path, i)))
             i = float(i)
             minimum = min(minimum, i) if minimum is not None else i
             maximum = max(maximum, i) if maximum is not None else i
-            print(i)
             if 'c1' in _f:
                 self.left_line.addPoint(i)
             if 'c2' in _f:

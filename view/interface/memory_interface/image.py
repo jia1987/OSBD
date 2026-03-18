@@ -9,6 +9,7 @@ from core import faultDetectionPipeline, ChannelInfo
 from core import utils
 from core.pipeline import FaultInfo
 from ...companent.font import getFont
+from ...companent.pipline_pixmap_label import PipelinePixmapLabelBase
 
 
 class ResultLabel(QLabel):
@@ -25,6 +26,8 @@ class ResultLabel(QLabel):
             self._pixmap = None
         else:
             self._pixmap = QPixmap(os.path.join(path, 'image.jpg'))
+            self._pixmap =  PipelinePixmapLabelBase.apply_colormap_to_pixmap(pixmap=self._pixmap)
+
             with open(os.path.join(path, 'fault.json'), 'r', encoding='utf-8') as f:
                 faults = json.load(f)
                 self._faults = FaultInfo.from_dict(**faults)
@@ -39,6 +42,7 @@ class ResultLabel(QLabel):
             resized_image: QPixmap = self._pixmap.scaled(self.size(), Qt.KeepAspectRatio)
         else:
             resized_image = self._pixmap
+
 
         # draw to gui
         painter = QPainter(self)

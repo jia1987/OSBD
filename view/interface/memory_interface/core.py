@@ -56,7 +56,6 @@ class MemoryhInterface(QWidget):
 
     def _read_a_batch(self, path):
         """ 点击 """
-        print(13123123)
         batchName = os.path.basename(path)
         self.faultOverview.load(path=path)
 
