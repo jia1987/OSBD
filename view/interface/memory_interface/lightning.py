@@ -28,8 +28,13 @@ class LightnReviewInterface(LightnInterface):
             self.clear()
             return
 
-        with open(path, 'r') as f:
-            info = FaultInfo.from_dict(**json.load(f))
+        try:
+            with open(path, 'r') as f:
+                info = FaultInfo.from_dict(**json.load(f))
+        except json.decoder.JSONDecodeError:
+            return
+        except Exception as e:
+            raise e
 
         self.setDistance(info.location)
         self.update()

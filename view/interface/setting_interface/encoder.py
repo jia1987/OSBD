@@ -45,19 +45,25 @@ class VSamplerSettingInterface(QWidget):
     def initLayout(self):
         self.viewLayout = QVBoxLayout(self)
         self.gridLayout = QGridLayout()
+        self.hlayout = QHBoxLayout()
         self.viewLayout.setContentsMargins(0, 0, 0, 0)
 
         self.viewLayout.addWidget(self.titleLabel)
         self.viewLayout.addLayout(self.gridLayout)
+        self.hlayout.addWidget(self.directionToggleBtn)
+        self.hlayout.addSpacerItem(QSpacerItem(0, 0, QSizePolicy.Expanding, QSizePolicy.Fixed))
+        self.hlayout.setStretch(0,1)
+        self.hlayout.setStretch(1,1)
 
         for i, (name, item) in enumerate([
             ('端口号', self.port_combox),
             ('波特率', self.baudrate_spinbox),
             ('单圈周长(cm)', self.perimeter_spinbox),
-            ('是否反向', self.directionToggleBtn)
         ]):
             self.gridLayout.addWidget(Label(self.tr(name), 16), i, 0, alignment=Qt.AlignRight)
             self.gridLayout.addWidget(item, i, 1, )
+        self.gridLayout.addWidget(Label(self.tr('是否反向'), 16), i + 1, 0, alignment=Qt.AlignRight)
+        self.gridLayout.addLayout(self.hlayout, i+1, 1, )
 
         self.gridLayout.setColumnStretch(0, 0)
         self.gridLayout.setColumnStretch(1, 1)

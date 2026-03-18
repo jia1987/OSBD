@@ -107,7 +107,7 @@ def anaylsis(cnt: np.ndarray,
     # print()
     # cv2.imwrite(f'cache/anaylsis-crop-{u}.jpg', crop_img)
     # u += 1
-    has_fault = std_outside > threshold and coherence.min() < 0.7
+    has_fault = std_outside > threshold and coherence.min() < 0.45
 
     # 没有缺陷
     if not has_fault:

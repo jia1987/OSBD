@@ -44,7 +44,7 @@ def detect(img: np.ndarray) -> List[DetectOutput]:
     # rgb or gray
     if len(img.shape) == 2:
         gray = img.astype(np.uint8)
-        img = np.tile(gray[:, :, np.newaxis], (1, 1, 3))
+        # gray = np.tile(gray[:, :, np.newaxis], (1, 1, 3))
     elif len(img.shape) == 3:
         assert img.shape[2] == 3, 'the channel should be 3'
         img = img.astype(np.uint8)
@@ -72,7 +72,7 @@ def detect(img: np.ndarray) -> List[DetectOutput]:
         feature = cv2.erode(feature, np.ones((3, 3), np.uint8), iterations=1)
         feature = cv2.dilate(feature, np.ones((3, 3), np.uint8), iterations=1)
         #     feature = cv2.erode(feature, np.ones((32, 24), np.uint8), iterations=1)
-    print(feature.shape)
+
     # Step 1：去背景（保留局部差异）
     # bg = cv2.GaussianBlur(feature, (1, 1), 0)
     # feature = cv2.subtract(bg, feature)

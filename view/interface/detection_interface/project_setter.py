@@ -42,13 +42,14 @@ class ExposureBatchBox(ComboBox):
 
 
 class BatchNameWidget(EdgegWidget):
-    PREX_BATCH = '检查批次:'
+    PREX_NOW = '当前'
+    PREX_BATCH = '批次:'
     PREX_WORKER = '负责人:'
 
     def __init__(self, parent=None):
         super(BatchNameWidget, self).__init__(parent)
-        self.batch_name_label = Label(text=self.PREX_BATCH, fontSize=16, parent=self)
-        self.woker_label = Label(text=self.PREX_WORKER, fontSize=16, parent=self)
+        self.batch_name_label = Label(text=self.PREX_NOW + self.PREX_BATCH, fontSize=16, parent=self)
+        self.woker_label = Label(text=self.PREX_NOW + self.PREX_WORKER, fontSize=16, parent=self)
         self.batch_name_edit = LineEdit(parent=self)
         self.swap_batch_btn = PushButton(text=self.tr('更换\n批次'), parent=self)
         self.usersBox = UsersComboBox(self)
@@ -57,19 +58,24 @@ class BatchNameWidget(EdgegWidget):
         self.viewLayout.setContentsMargins(5, 5, 5, 5)
         self.hlayout1 = QHBoxLayout()
         self.hlayout2 = QHBoxLayout()
-        self.vlayout1 = QVBoxLayout()
+        self.glayout1 = QGridLayout()
         self.viewLayout.addWidget(self.batch_name_label)
         self.viewLayout.addWidget(self.woker_label)
         # layout: 2
-        self.vlayout1.addWidget(self.batch_name_edit)
-        self.vlayout1.addWidget(self.usersBox)
-        self.hlayout2.addLayout(self.vlayout1)
+        self.glayout1.addWidget(Label(self.tr(self.PREX_BATCH), fontSize=16, parent=self), 0, 0,
+                                alignment=Qt.AlignRight)
+        self.glayout1.addWidget(self.batch_name_edit, 0, 1)
+        self.glayout1.addWidget(Label(self.tr(self.PREX_WORKER), fontSize=16, parent=self), 1, 0,
+                                alignment=Qt.AlignRight)
+        self.glayout1.addWidget(self.usersBox, 1, 1)
+        self.hlayout2.addLayout(self.glayout1)
         self.hlayout2.addWidget(self.swap_batch_btn)
         self.viewLayout.addLayout(self.hlayout2)
 
         self.swap_batch_btn.clicked.connect(self._batch_name_clicked)
-        SignalBus.batchUpdated.connect(lambda b, w: (self.batch_name_label.setText(self.tr(self.PREX_BATCH) + b),
-                                                     self.woker_label.setText(self.tr(self.PREX_WORKER) + w),))
+        SignalBus.batchUpdated.connect(
+            lambda b, w: (self.batch_name_label.setText(self.tr(self.PREX_NOW + self.PREX_BATCH) + b),
+                          self.woker_label.setText(self.tr(self.PREX_NOW + self.PREX_WORKER) + w),))
 
     def _batch_name_clicked(self, ):
         if self.batch_name_edit.text() == '':

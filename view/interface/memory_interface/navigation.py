@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout
 
 from core.const import Path
 from core.database import UserManager
-from ...companent import Label,ListView
+from ...companent import Label, ListView
 
 
 class Navigation(QWidget):
@@ -17,6 +17,7 @@ class Navigation(QWidget):
 
     BATCH_NAME_TAG = '批次:'
     USER_NAME_TAG = '负责人:'
+
     def __init__(self, parent=None):
         self._check_batch_name = None
         self._manager = UserManager()
@@ -76,9 +77,8 @@ class Navigation(QWidget):
             items = os.listdir(read_dir)
             items = list(set(items))
             items = sorted(items, key=lambda item: float(item))
-            self._update_list(list_view=self.result_list,
-                              items=items)
-            self.faultSetUpdated.emit(read_dir)
+            self._update_list(list_view=self.result_list, items=items)
+
 
     def _update_list(self, list_view, items):
         """ 根据一个 path 更新 listView"""
@@ -99,10 +99,13 @@ class Navigation(QWidget):
         item = model.itemFromIndex(index)
         username = self._manager.getUsersByBatch(batchName=item.text())
 
-        self.batch_label.setText(self.tr(self.BATCH_NAME_TAG)+ ' ' + item.text())
+        self.batch_label.setText(self.tr(self.BATCH_NAME_TAG) + ' ' + item.text())
         self.user_label.setText(self.tr(self.USER_NAME_TAG) + ' ' + (username or '无'))
         self._check_batch_name = item.text()
         self._update_all_list()
+        # 发送型号
+        read_dir = os.path.join(Path.OUTPUT_DIR, self._check_batch_name)
+        self.faultSetUpdated.emit(read_dir)
 
     def _on_result_list_clicked(self, index):
         """ 点击 """

@@ -1,60 +1,184 @@
 from PyQt5.QtWidgets import QWidget, QGridLayout, QVBoxLayout, QHBoxLayout, QSpacerItem, QSizePolicy
-from PyQt5.QtGui import QPixmap, QOpenGLShader, QPainter, QPen
-from PyQt5.QtCore import Qt, QTimer, QPoint, QPointF, QRectF
+from PyQt5.QtGui import QPixmap, QOpenGLShader, QPainter, QPen, QColor
+from PyQt5.QtCore import Qt, QTimer, QPoint, QPointF, QRectF, QLineF
 from .label import Label
 from .edge import EdgegWidget
 from core.pipeline import faultDetectionPipeline
 from typing import List, Set
 
 
+# class FaultLine(QWidget):
+#     """ 显示一根漆包线其中一个面上的缺陷所在点 """
+#
+#     def __init__(self, parent=None):
+#         super(FaultLine, self).__init__(parent)
+#         # 纯在缺陷的点
+#         self.fualt_point: Set[float] = set()
+#         self._scope = (0, 1)
+#         self.clear()
+#
+#     def setScope(self, minimum, maximum):
+#         """ 设置范围 """
+#         self._scope = (minimum, maximum)
+#
+#     def addPoint(self, point: float):
+#         """ 添加一个缺陷点"""
+#         self.fualt_point.add(point)
+#
+#     def clear(self):
+#         self.fualt_point.clear()
+#         self._scope = (0, 1)
+#
+#     def paintEvent(self, event):
+#         super(FaultLine, self).paintEvent(event)
+#         rect = self.rect()
+#         painter = QPainter(self)
+#         painter.setRenderHint(QPainter.Antialiasing)
+#
+#         pen = QPen(Qt.gray)
+#         pen.setWidth(self.height() // 8)
+#         pen.setCapStyle(Qt.RoundCap)
+#         painter.setPen(pen)
+#         painter.drawLine(self.height() // 8, rect.height() // 2, rect.width() - self.height() // 8, rect.height() // 2)
+#
+#         # =======================
+#         # 绘制缺陷点
+#         # =======================
+#         if len(self.fualt_point) > 0:
+#             rect = QRectF(0, self.height() * (1 / 2 - 1 / 4), 2, rect.height() / 2)
+#             painter.setPen(Qt.NoPen)
+#             painter.setBrush(Qt.red)
+#             _min, _max = self._scope
+#             _scope = _max - _min
+#             for point in self.fualt_point:
+#                 # 使用两个像素表示缺陷
+#                 point = (point - _min) / _scope * self.width()
+#                 rect.moveTo(point, rect.top())
+#                 painter.drawRoundedRect(rect, 1, 1)
+
+
 class FaultLine(QWidget):
-    """ 显示一根漆包线其中一个面上的缺陷所在点 """
+    """显示一根漆包线其中一个面上的缺陷所在点（优化版）"""
 
     def __init__(self, parent=None):
         super(FaultLine, self).__init__(parent)
-        # 纯在缺陷的点
         self.fualt_point: Set[float] = set()
         self._scope = (0, 1)
+
+        # ====== 优化缓存 ======
+        self._points_px = []  # 归一化后的点（0~1）
+        self._cache_dirty = True
+        self._pixmap_cache = None
+
+        # 控制最大绘制点数（防止卡顿）
+        self._max_points = 2000
+
         self.clear()
 
     def setScope(self, minimum, maximum):
-        """ 设置范围 """
+        """设置范围"""
         self._scope = (minimum, maximum)
+        self._cache_dirty = True
+        self.update()
 
     def addPoint(self, point: float):
-        """ 添加一个缺陷点"""
+        """添加一个缺陷点"""
         self.fualt_point.add(point)
+        self._cache_dirty = True
 
     def clear(self):
         self.fualt_point.clear()
         self._scope = (0, 1)
+        self._points_px = []
+        self._cache_dirty = True
+        self.update()
 
+    # =========================
+    # 关键优化：预计算
+    # =========================
+    def _updateCache(self):
+        if not self._cache_dirty:
+            return
+
+        _min, _max = self._scope
+        _scope = _max - _min if _max != _min else 1.0
+
+        # 归一化
+        points = [(p - _min) / _scope for p in self.fualt_point]
+
+        # 过滤非法值
+        points = [p for p in points if 0 <= p <= 1]
+
+        # ===== 降采样（关键优化）=====
+        if len(points) > self._max_points:
+            step = len(points) // self._max_points
+            points = points[::step]
+
+        self._points_px = points
+        self._cache_dirty = False
+
+    # =========================
+    # 可选：Pixmap缓存（极大提升）
+    # =========================
+    def _updatePixmapCache(self):
+        if self._pixmap_cache is not None and not self._cache_dirty:
+            return
+
+        self._updateCache()
+
+        w, h = self.width(), self.height()
+        if w <= 0 or h <= 0:
+            return
+
+        pixmap = QPixmap(w, h)
+        pixmap.fill(Qt.transparent)
+
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        # 画线
+        g = h // 8
+        pen = QPen(Qt.gray)
+        pen.setWidth(g)
+        pen.setCapStyle(Qt.RoundCap)
+        painter.setPen(pen)
+        painter.drawLine(g, g * 4, w - g, g * 4)
+
+        # 画点（批量）
+
+        if self._points_px:
+            # QPen(brush: Union[QBrush, QColor, Qt.GlobalColor, QGradient],
+            # width: float,
+            # style: Qt.PenStyle = Qt.SolidLine,
+            # cap: Qt.PenCapStyle = Qt.SquareCap,
+            # join: Qt.PenJoinStyle = Qt.BevelJoin
+            painter.setPen(QPen(QColor(255, 0, 0), 2, Qt.SolidLine, Qt.RoundCap))
+            y = h / 4
+            w = w - g * 2
+            lines = [QLineF(g + px * w, y,
+                            g + px * w, y * 3) for px in self._points_px]
+
+            painter.drawLines(lines)
+
+        painter.end()
+        self._pixmap_cache = pixmap
+
+    def resizeEvent(self, event):
+        super(FaultLine, self).resizeEvent(event)
+        self._cache_dirty = True
+
+    # =========================
+    # 绘制
+    # =========================
     def paintEvent(self, event):
-        super(FaultLine, self).paintEvent(event)
-        rect = self.rect()
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
 
-        pen = QPen(Qt.gray)
-        pen.setWidth(self.height() // 8)
-        pen.setCapStyle(Qt.RoundCap)
-        painter.setPen(pen)
-        painter.drawLine(self.height() // 8, rect.height() // 2, rect.width() - self.height() // 8, rect.height() // 2)
+        # 使用缓存
+        self._updatePixmapCache()
 
-        # =======================
-        # 绘制缺陷点
-        # =======================
-        if len(self.fualt_point) > 0:
-            rect = QRectF(0, self.height() * (1 / 2 - 1 / 4), 2, rect.height() / 2)
-            painter.setPen(Qt.NoPen)
-            painter.setBrush(Qt.red)
-            _min, _max = self._scope
-            _scope = _max - _min
-            for point in self.fualt_point:
-                # 使用两个像素表示缺陷
-                point = (point - _min) / _scope * self.width()
-                rect.moveTo(point, rect.top())
-                painter.drawRoundedRect(rect, 1, 1)
+        if self._pixmap_cache:
+            painter.drawPixmap(0, 0, self._pixmap_cache)
 
 
 class FaultOverview(EdgegWidget):
