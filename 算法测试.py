@@ -1,8 +1,12 @@
 import os
 import shutil
+import time
+
 from core.pipeline.fault_detection import detect
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
+
+
 def dataset():
     path = r'E:\study\My-GitHub-Project\漆包线检测\output\1'
     os.makedirs('cache\dataset', exist_ok=True)
@@ -17,7 +21,9 @@ def dataset():
                 i = i + 1
         print(p1, p2, p3)
 
+
 import cv2
+
 
 def visualize_detect(image, outputs):
     img = image.copy()
@@ -47,20 +53,38 @@ def visualize_detect(image, outputs):
         )
 
     return img
+
+
 if __name__ == '__main__':
+    path = r'cache/dataset'
     # dataset()
+    files = os.listdir(path)
+    files = ['7.jpg']
+    # files = ['104.jpg']
+    # image = Image.open(os.path.join(path,)'cache/dataset/115.jpg')
+    # image = np.array(image)
 
-    image = Image.open('cache/dataset/115.jpg')
-    image = np.array(image)
-    print(image.shape)
+    key, idx = -1, 0
+    while key != 27:
+        idx = max(min(idx, len(files) - 1), 0)
+        file = files[idx]
+        image = Image.open(os.path.join(path, files[idx]))
+        image = np.array(image)
+        st = time.time()
+        outputs = detect(image)
+        print(f'{file}: time:{time.time() - st}')
 
+        vis = visualize_detect(image, outputs)
 
-
-    outputs = detect(image)
-
-    vis = visualize_detect(image, outputs)
-
-    cv2.imshow("result", vis)
-    cv2.waitKey(0)
+        cv2.imshow("result", vis)
+        while True:
+            key = cv2.waitKey(0)
+            if key == 119:  # w
+                idx -= 1
+                break
+            elif key == 115: # s
+                idx += 1
+                break
+            elif key == 27: # esc
+                break
     cv2.destroyAllWindows()
-

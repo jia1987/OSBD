@@ -180,6 +180,7 @@ class FaultDetectionPipeline(SettingMixin, PrepareMixin, SaveMixin, VSamplerMixi
             else:
                 for k, v in self.channel_bus.items():
                     info = self.channel_bus[k]
+                    # print(info)
                     if len(info.faults) == 0: continue
                     self.save(fault=FaultInfo(image=info.detect_image,
                                               faults=info.faults,

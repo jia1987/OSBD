@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-
+import os
 from ..error import OpencvCameraConnectError
 from ...HK_MvImport.MvCameraControl_class import MV_TRIGGER_MODE_OFF, MV_TRIGGER_SOURCE_LINE0,MV_TRIGGER_MODE_ON
 from ...hk_camera import Camera as HK_Camera
@@ -88,7 +88,9 @@ class VedioCamera(CameraAbstract):
 class ImageCamera(CameraAbstract):
     def __init__(self, path: str):
         data = np.fromfile(path, dtype=np.uint8)
-        self._img = cv2.imdecode(data, cv2.IMREAD_COLOR)
+        img = cv2.imdecode(data, cv2.IMREAD_COLOR)
+        self._img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        cv2.imwrite(os.path.basename(path), self._img)
 
     def read(self):
         return self._img

@@ -77,6 +77,28 @@ def anaylsis(cnt: np.ndarray,
     std_outside = _jit_std_with_mask(arr=crop_img, mean=mean_outside, mask=mask)
     # std_outside = np.sum((crop_img - mean_outside) ** 2 * mask_cnt) / np.sum(mask_cnt)
 
+    # 计算梯度方向
+    gx = cv2.Sobel(crop_img, cv2.CV_32F, 1, 0, ksize=3)
+    gy = cv2.Sobel(crop_img, cv2.CV_32F, 0, 1, ksize=3)
+    # angle = np.arctan2(gy, gx)
+    # 转成向量（关键！避免角度跳变）
+    # cos_a = np.cos(angle)
+    # sin_a = np.sin(angle)
+    # 在候选区域内计算“方向一致性”
+    # mean_cos = np.mean(cos_a)
+    # mean_sin = np.mean(sin_a)
+    # coherence = np.sqrt(mean_cos ** 2 + mean_sin ** 2)
+    # print(coherence.max(), coherence.min())
+    Jxx = cv2.GaussianBlur(gx * gx, (9, 9), 0)
+    Jyy = cv2.GaussianBlur(gy * gy, (9, 9), 0)
+    Jxy = cv2.GaussianBlur(gx * gy, (9, 9), 0)
+    tmp = np.sqrt((Jxx - Jyy) ** 2 + 4 * Jxy * Jxy)
+    lambda1 = (Jxx + Jyy + tmp) / 2
+    lambda2 = (Jxx + Jyy - tmp) / 2
+    coherence = (lambda1 - lambda2) / (lambda1 + lambda2 + 1e-5)
+
+    print('coherence:', coherence.min())
+
     # mask = 255 - mask.astype(np.uint8) * 255
     # result_ns = cv2.inpaint(crop_img, mask, 7, cv2.INPAINT_TELEA)  # Navier-Stokes
     # ssim_index = compute_ssim(crop_img, result_ns)
@@ -85,7 +107,7 @@ def anaylsis(cnt: np.ndarray,
     # print()
     # cv2.imwrite(f'cache/anaylsis-crop-{u}.jpg', crop_img)
     # u += 1
-    has_fault = std_outside > threshold
+    has_fault = std_outside > threshold and coherence.min() < 0.45
 
     # 没有缺陷
     if not has_fault:
@@ -102,7 +124,7 @@ def anaylsis(cnt: np.ndarray,
     feature_gxy, feature_residual = _jit_feature_with_gxy_residual(gxy=crop_gxy, residual=crop_residual, mask=mask)
     area = cv2.contourArea(cnt)  # 计算面积
     perimeter = cv2.arcLength(cnt, True)  # 计算周长
-    a_p_r = area * math.pi * 4 / perimeter
+    a_p_r = area * math.pi * 4 / perimeter # 圆度
     # print(feature_gxy, feature_residual, area, perimeter, a_p_r)
 
     if a_p_r > 100:
@@ -111,6 +133,8 @@ def anaylsis(cnt: np.ndarray,
         fault_type = FaultEnum.Particle
     elif feature_residual >= 0:
         fault_type = FaultEnum.Bubble
+    else:
+        fault_type = FaultEnum.Particle
 
     return AnaylsisOutput(
         has_fault=has_fault,

@@ -24,7 +24,8 @@ def gamma_format(img, gamma=2.) -> np.ndarray:
 
 @numba.jit(nopython=True)
 def _jit_gxy(gx, gy):
-    gxy = (0.75 * gx ** 2 + 1.25 * gy ** 2) ** 0.5
+    gxy = ( gx ** 2 +
+            gy ** 2) ** 0.5
     return gxy
 
 
@@ -50,7 +51,7 @@ def _jit_weighted_canny(gray, low_thresh=50, high_thresh=150) -> Output:
 
     # 腐蚀膨胀
     gxy = _jit_uniform(_gxy.astype(np.float32))
-    for _ in range(1):
+    for _ in range(0):
         # gxy = cv2.dilate(gxy, np.ones((3, 15), np.uint8), iterations=1)
         # gxy = cv2.erode(gxy, np.ones((7, 7), np.uint8), iterations=1)
         gxy = cv2.blur(gxy, (5, 5))
