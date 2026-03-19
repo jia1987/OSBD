@@ -6,7 +6,47 @@ from PyQt5.QtCore import Qt, QRectF, QPointF, pyqtSignal, QPoint
 from core import faultDetectionPipeline, ChannelInfo
 from core import utils
 from .font import getFont
+from functools import lru_cache
+from PyQt5.QtGui import QColor
 
+
+@lru_cache(maxsize=8)
+def _build_lut(colormap: str):
+    table = []
+
+    for i in range(256):
+        x = i / 255.0
+
+        if colormap == "jds":
+            r = 200 * x + 40
+            g = 160 * x + 30
+            b = 100 * x + 20
+
+        elif colormap == "jet":
+            r = min(max(1.5 - abs(4*x - 3), 0), 1) * 255
+            g = min(max(1.5 - abs(4*x - 2), 0), 1) * 255
+            b = min(max(1.5 - abs(4*x - 1), 0), 1) * 255
+
+        elif colormap == "hot":
+            r = min(1, 3*x) * 255
+            g = min(1, max(0, 3*x - 1)) * 255
+            b = min(1, max(0, 3*x - 2)) * 255
+
+        elif colormap == "cool":
+            r = x * 255
+            g = (1 - x) * 255
+            b = 255
+
+        else:
+            r = g = b = i
+
+        table.append(QColor(
+            int(min(255, r)),
+            int(min(255, g)),
+            int(min(255, b))
+        ).rgb())
+
+    return table
 
 class PipelinePixmapLabelBase(QLabel):
     """ Base: 管线图像处理部分的显示Label """
@@ -14,59 +54,18 @@ class PipelinePixmapLabelBase(QLabel):
 
     @staticmethod
     def apply_colormap_to_pixmap(pixmap: QPixmap, colormap: str = "jds") -> QPixmap:
-        """
-        灰度 QPixmap → 彩色 QPixmap（纯 Qt 实现）
+        img = pixmap.toImage()
 
-        colormap: "jet" / "hot" / "cool" / "gray"
-        """
+        if img.format() != QImage.Format_Grayscale8:
+            img = img.convertToFormat(QImage.Format_Grayscale8)
 
-        # === 转 QImage 并确保灰度格式 ===
-        img = pixmap.toImage().convertToFormat(QImage.Format_Indexed8)
+        img = img.convertToFormat(QImage.Format_Indexed8)
 
-        # === 构造 LUT ===
-        color_table = []
+        img.setColorTable(_build_lut(colormap))
 
-        for i in range(256):
-            x = i / 255.0
-            if colormap == "jds":
-                # 🎯 核心：压缩对比度（变柔）
-                x = 0.6 * x + 0.2  # 映射到 [0.2, 0.8]
-                x = 1 - x
-                # 🎯 暖色调映射（棕色系）
-                r = (200 * x + 40) / 255
-                g = (160 * x + 30) / 255
-                b = (100 * x + 20) / 255
-
-                # 限制范围
-                r = min(1, r)
-                g = min(1, g)
-                b = min(1, b)
-            elif colormap == "jet":
-                r = min(max(1.5 - abs(4 * x - 3), 0), 1)
-                g = min(max(1.5 - abs(4 * x - 2), 0), 1)
-                b = min(max(1.5 - abs(4 * x - 1), 0), 1)
-
-            elif colormap == "hot":
-                r = min(1, 3 * x)
-                g = min(1, max(0, 3 * x - 1))
-                b = min(1, max(0, 3 * x - 2))
-
-            elif colormap == "cool":
-                r = x
-                g = 1 - x
-                b = 1
-
-            else:  # gray
-                r = g = b = x
-
-            color_table.append(QColor(int(r * 255), int(g * 255), int(b * 255)).rgb())
-
-        # === 应用 LUT（核心，零拷贝）===
-        img.setColorTable(color_table)
-        img.save('1.jpg')
-
-        # === 转回 QPixmap ===
         return QPixmap.fromImage(img)
+
+
 
     def __init__(self, ctx: str, parent=None):
         self._ctx = ctx
