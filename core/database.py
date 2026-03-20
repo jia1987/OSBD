@@ -45,6 +45,8 @@ class UserManager:
         self._ensureDefaultAdmin()
 
     def _initDb(self):
+        if not os.path.exists(self.dbName):
+            os.makedirs(os.path.dirname(self.dbName),exist_ok=True)
         conn = sqlite3.connect(self.dbName)
         cursor = conn.cursor()
 

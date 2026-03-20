@@ -19,21 +19,24 @@ class LightningSettingInterface(QWidget):
     def initWidget(self):
         self.titleLabel = Label(text=self.tr('放电检测'), weight=QFont.Bold, fontSize=32, parent=self, )
 
-        self.port_combox = SerialPortComboBox(self)
-        self.baudrate_spinbox = SpinBox(self)
+        #self.port_combox = SerialPortComboBox(self)
+        #self.baudrate_spinbox = SpinBox(self)
 
     def initConnect(self):
-        self.baudrate_spinbox.valueChanged.connect(lambda v: config.set(config.Lightning_Baudrate, value=v))
-        self.port_combox.currentTextChanged.connect(
-            lambda v: config.set(config.Lightning_Port, value=self.port_combox.currentText()))
-        self.port_combox.currentIndexChanged.connect(
-            lambda v: config.set(config.Lightning_Port, value=self.port_combox.currentText()))
+
+        pass
+        # self.baudrate_spinbox.valueChanged.connect(lambda v: config.set(config.Lightning_Baudrate, value=v))
+        # self.port_combox.currentTextChanged.connect(
+        #     lambda v: config.set(config.Lightning_Port, value=self.port_combox.currentText()))
+        # self.port_combox.currentIndexChanged.connect(
+        #     lambda v: config.set(config.Lightning_Port, value=self.port_combox.currentText()))
 
     def initData(self):
-        self.port_combox.setCurrentText(config.get(config.Lightning_Port))
-        self.port_combox.addItem(config.get(config.Lightning_Port))
-        self.baudrate_spinbox.setRange(0, 2 ** 31 - 1, )
-        self.baudrate_spinbox.setValue(config.get(config.Lightning_Baudrate))
+        pass
+        #self.port_combox.setCurrentText(config.get(config.Lightning_Port))
+        #self.port_combox.addItem(config.get(config.Lightning_Port))
+        #self.baudrate_spinbox.setRange(0, 2 ** 31 - 1, )
+        #self.baudrate_spinbox.setValue(config.get(config.Lightning_Baudrate))
 
     def initLayout(self):
         self.viewLayout = QVBoxLayout(self)
@@ -44,8 +47,8 @@ class LightningSettingInterface(QWidget):
         self.viewLayout.addLayout(self.gridLayout)
 
         for i, (name, item) in enumerate([
-            ('端口号', self.port_combox),
-            ('波特率', self.baudrate_spinbox),
+        #    ('端口号', self.port_combox),
+        #    ('波特率', self.baudrate_spinbox),
         ]):
             self.gridLayout.addWidget(Label(self.tr(name), 16), i, 0, alignment=Qt.AlignRight)
             self.gridLayout.addWidget(item, i, 1, )

@@ -68,15 +68,15 @@ if __name__ == '__main__':
     # ==========验证程序===========
     from core.utils.machine_id import get_machine_fingerprint, verify_license
     from core.const import Text
-    with open('config/pub_key', 'rb') as f:
-        pub = f.read()
-    with open('config/license', 'r') as f:
-        license = f.read()
-    mid = get_machine_fingerprint(extra_salt=Text.APP_NAME)
-    with open('config/mid', 'w', encoding='utf8') as f:
-        f.write(mid)
-    ok, msg = verify_license(pub, license,extra_salt=Text.APP_NAME)
-    if ok or True:
+    # with open('config/pub_key', 'rb') as f:
+    #     pub = f.read()
+    # with open('config/license', 'r') as f:
+    #     license = f.read()
+    # mid = get_machine_fingerprint(extra_salt=Text.APP_NAME)
+    # with open('config/mid', 'w', encoding='utf8') as f:
+    #     f.write(mid)
+    # ok, msg = verify_license(pub, license,extra_salt=Text.APP_NAME)
+    if True:
         from view import Window
 
         print("[System] init window...")

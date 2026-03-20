@@ -61,10 +61,6 @@ class CameraMixin():
                     PipelineType.CAMERAS,
                     config.get(config.Camera_Prots),
                     config.get(config.Camera_Exposures))):
-                if port is None:
-                    print(f"[System] {k}: Not port...")
-                    continue
-
                 # inti camera
                 try:
                     camera = Camera(read_mode=config.get(config.Camera_ReadModes)[number],
