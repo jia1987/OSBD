@@ -58,3 +58,4 @@ config/
 *.EXE
 *.zip
 *.ZIP
+*.xlsx
