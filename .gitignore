@@ -46,6 +46,7 @@ output/
 
 #忽略配置文件
 config/
+设备清单.xlsx
 
 # 忽略文件
 *.jpg
