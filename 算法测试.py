@@ -8,7 +8,7 @@ import numpy as np
 
 
 def dataset():
-    path = r'E:\study\My-GitHub-Project\漆包线检测\output\1'
+    path = r'\output\1'
     os.makedirs('cache\dataset', exist_ok=True)
     i = 0
     for p1, p2, p3 in os.walk(path):
