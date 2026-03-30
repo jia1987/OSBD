@@ -2,10 +2,13 @@ import time, pickle
 import cv2, sys,os
 
 
-from fault_detection import detect
+from fault_detection import detect,DetectOutput
+from fault_detection.anaylsis import FaultEnum
 import numpy as np
 import multiprocessing.shared_memory as shm
 import argparse
+import onnxruntime as ort
+from ultralytics import YOLO
 from PIL import Image
 
 WRITE_FINISHED_FLAG = 0
@@ -23,7 +26,7 @@ def get_args():
     args = parser.parse_args()
     return args
 
-
+USE_YOLO = True
 def main():
     args = get_args()
     width, height = args.width, args.height
@@ -31,12 +34,31 @@ def main():
     img_shm = shm.SharedMemory(name=args.img_shm_name)
     op_shm = shm.SharedMemory(name=args.op_shm_name)
     out_shm = shm.SharedMemory(name=args.out_shm_name)
+    if USE_YOLO:
+        model_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))),'_rc','yolo.onnx')
+        yolo = YOLO(model_path)
     while True:
         if op_shm.buf[WRITE_FINISHED_FLAG] != 1:
             time.sleep(0.001)
             continue
         img = np.ndarray((height, width), dtype=np.uint8, buffer=img_shm.buf).copy()
-        output = detect(img)
+
+        if USE_YOLO:
+            result = yolo(np.repeat(img[:, :, np.newaxis], 3, axis=-1), imgsz=320, verbose=False)
+            output = []
+            boxes = result[0].boxes.xywh.cpu().numpy()  # 转为numpy数组
+            confs = result[0].boxes.conf.cpu().numpy()
+            classes = result[0].boxes.cls.cpu().numpy()
+
+            for j, (box, conf, cls) in enumerate(zip(boxes, confs, classes)):
+                # print(box, conf, cls)
+                output.append(DetectOutput(x=box[0], y=box[1], w=box[2], h=box[3],
+                                           ftype=(FaultEnum.Bubble,
+                                                  FaultEnum.Particle,
+                                                  FaultEnum.Tumor,
+                                                  FaultEnum.Sticky_Line)[int(cls)], ))
+        else:
+            output = detect(img)
 
         # 回传
         data_bytes = pickle.dumps([o.to_dict() for o in output])

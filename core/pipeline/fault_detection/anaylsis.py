@@ -10,6 +10,7 @@ class FaultEnum():
     Sticky_Line = '毛粘线'
     Bubble = '汽包'
     Particle = '粒子'
+    Tumor= '漆瘤'
 
 
 @dataclass
