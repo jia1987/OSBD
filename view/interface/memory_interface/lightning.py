@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QStackedWidget, Q
 from PyQt5.QtWidgets import QApplication, QMainWindow, QListView
 
 from ...companent import Label, Pivot, LightnInterface, FaultOverview
-from .image import ResultLabel
+
 from .vision import VisionDetectWidgwt
 from .navigation import Navigation
 from .fault_overview import BatchFaultOverview

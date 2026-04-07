@@ -1,7 +1,7 @@
 from .panel import Panel
 from .pivot import Pivot
 from .icon import Icon
-from .pipline_pixmap_label import PipelineCameraLabel, PipelineResultLabel
+from .pipline_pixmap_label import PipelineCameraLabel, PipelineResultLabel, ResultLabel
 from .label import Label
 from .mask_box import MaskBox
 from .rangle_slider import RangeSlider

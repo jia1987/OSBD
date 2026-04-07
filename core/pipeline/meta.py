@@ -26,6 +26,7 @@ class ChannelInfo():
     detect_image: np.ndarray = None
     show_image: np.ndarray = None
     faults: List[DetectOutput] = None
+    position:float = 0.0
 
     def clear(self):
         self.oringe_image = None
@@ -38,6 +39,7 @@ class ChannelInfo():
         raise NotImplementedError
 
 
+
 @dataclass
 class FaultInfo():
     image: np.ndarray = None
@@ -46,6 +48,7 @@ class FaultInfo():
     location: float = None
     batchName: str = None
     camera: str = None
+    sampler: str = None
     worker: str = None
 
     @classmethod

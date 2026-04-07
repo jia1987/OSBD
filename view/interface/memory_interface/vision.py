@@ -6,8 +6,8 @@ from PyQt5.QtGui import QStandardItemModel, QStandardItem
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QStackedWidget, QListView, QGridLayout
 from PyQt5.QtWidgets import QApplication, QMainWindow, QListView
 
-from ...companent import Label, Pivot,LightnInterface,EdgegWidget
-from .image import ResultLabel
+from ...companent import Label, Pivot,LightnInterface,EdgegWidget,ResultLabel
+# from .image import ResultLabel
 from core.const import Path
 from core.pipeline import faultDetectionPipeline
 

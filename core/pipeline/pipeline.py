@@ -6,7 +6,7 @@ import threading
 import time
 from multiprocessing import shared_memory
 from os import times_result
-from typing import List
+from typing import List,Iterable
 
 import numpy as np
 
@@ -114,6 +114,8 @@ class FaultDetectionPipeline(SettingMixin, PrepareMixin, SaveMixin, VSamplerMixi
         self._accumulatedDistance_for_batch = 0
         # 处理的fps
         self._process_time = None
+        # 最后处理的缺陷
+        self._last_faults = None
 
     def start(self):
         """ start detection pipeline """
@@ -136,16 +138,7 @@ class FaultDetectionPipeline(SettingMixin, PrepareMixin, SaveMixin, VSamplerMixi
 
     def _image_detect_thread(self):
         """ 检测线程: 对于四个通道的摄像头数据进行图像处理"""
-        while True:
-            # ------
-            # 是否启动了检测功能
-            # ----
-            if not self.isDetectEnabled():
-                self.setState(state=self.State_DetectDisable)
-                time.sleep(0.1)
-                continue
-
-            st = time.time()
+        def detect_image():
             # ===========================
             # 读取图片, 图像识别
             # ==========================
@@ -175,21 +168,63 @@ class FaultDetectionPipeline(SettingMixin, PrepareMixin, SaveMixin, VSamplerMixi
 
             # save
             # 如果没有设置批次则不保存
-            if self.batchName() is None or self.batchName() == '':
-                self.setState(state=SettingMixin.State_NoBacthName)
-            else:
-                for k, v in self.channel_bus.items():
-                    info = self.channel_bus[k]
-                    # print(info)
-                    if len(info.faults) == 0: continue
-                    self.save(fault=FaultInfo(image=info.detect_image,
-                                              faults=info.faults,
-                                              location=self.accumulatedDistance(obj='batch'),
-                                              batchName=self.batchName(),
-                                              worker=self.workerName(),
-                                              camera=k, ))
-                # 结束
-                self.setState(state=SettingMixin.State_Normal)
+            result = []
+            for k, v in self.channel_bus.items():
+                info = self.channel_bus[k]
+                if len(info.faults) == 0: continue
+                result.append(FaultInfo(image=info.detect_image,
+                                        faults=info.faults,
+                                        location=self.accumulatedDistance(obj='batch'),
+                                        batchName=self.batchName(),
+                                        worker=self.workerName(),
+                                        sampler=k,
+                                        camera=k, ))
+
+
+            return result
+
+
+        def detect_lightning():
+            # 读取结果
+            output = self.lightningOutput()
+            output.distance = self.accumulatedDistance(obj='batch')
+            result = []
+            if output.fault:  # <--存在缺陷
+                result.append(FaultInfo(camera='lightning',
+                                        faults=[DetectOutput(0, 0, 0, 0, ftype='针孔缺陷')],
+                                        location=output.distance,
+                                        batchName=self.batchName(),
+                                        sampler="放电检测",
+                                        worker=self.workerName()))
+                # sleep
+                time.sleep(0.3)
+                self.clearLightningOutput()
+            return result
+
+        while True:
+            # ------
+            # 是否启动了检测功能
+            # ----
+            if not self.isDetectEnabled():
+                self.setState(state=self.State_DetectDisable)
+                time.sleep(0.1)
+                continue
+            st = time.time()
+            # -----  core ----
+            result = []
+            result += detect_image()
+            result += detect_lightning()
+            self._last_faults = result
+            # 回调
+            if len(result) != 0:
+                self.callback()()
+
+            # 保存
+            post_fix = f', 无保存'
+            if self.batchName() is not None and self.batchName() != '':
+                for f in result: self.save(fault=f)
+                post_fix = f', 保存至{self.batchName()}'
+            self.setState(state=SettingMixin.State_Normal + post_fix)
 
             # 如果没有读取到数据,睡眠, 不要阻塞UI线程
             interval = time.time() - st
@@ -203,27 +238,13 @@ class FaultDetectionPipeline(SettingMixin, PrepareMixin, SaveMixin, VSamplerMixi
             # 是否启动了检测功能
             # ----
             if not self.isDetectEnabled():
-                self.setState(state=self.State_DetectDisable)
+                # self.setState(state=self.State_DetectDisable)
                 time.sleep(0.1)
                 continue
             # 没有启动放电检测, 不用进行读取
             st = time.time()
 
-            # 读取结果
-            output = self.lightningOutput()
-            output.distance = self.accumulatedDistance(obj='batch')
-            if output.fault:  # <--存在缺陷
-                if not (self.batchName() is None or self.batchName() == ''):
-                    self.save(fault=FaultInfo(camera='lightning',
-                                              faults=[DetectOutput(0, 0, 0, 0, ftype='针孔缺陷')],
-                                              location=output.distance,
-                                              batchName=self.batchName(),
-                                              worker=self.workerName()))
-                # 回调
-                self.callback()()
-                # sleep
-                time.sleep(0.3)
-                self.clearLightningOutput()
+
             # 如果没有读取到数据,睡眠, 不要阻塞UI线程
             if (sleep_time := 0.03 - (time.time() - st)) > 0: time.sleep(sleep_time)
 
@@ -245,6 +266,10 @@ class FaultDetectionPipeline(SettingMixin, PrepareMixin, SaveMixin, VSamplerMixi
     def pipelineState(self) -> str:
         """ 管线的当前状态 """
         return self._pipeline_state
+
+    def lastFault(self)->Iterable[FaultInfo]:
+        return self._last_faults
+
 
 
 faultDetectionPipeline = None

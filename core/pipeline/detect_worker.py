@@ -52,7 +52,7 @@ def main():
 
             for j, (box, conf, cls) in enumerate(zip(boxes, confs, classes)):
                 # print(box, conf, cls)
-                output.append(DetectOutput(x=box[0], y=box[1], w=box[2], h=box[3],
+                output.append(DetectOutput(x=float(box[0]), y=float(box[1]), w=float(box[2]), h=float(box[3]),
                                            ftype=(FaultEnum.Bubble,
                                                   FaultEnum.Particle,
                                                   FaultEnum.Tumor,

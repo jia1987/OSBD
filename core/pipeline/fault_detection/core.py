@@ -18,10 +18,10 @@ u = 1
 
 @dataclass
 class DetectOutput:
-    x: int
-    y: int
-    w: int
-    h: int
+    x: int or float
+    y: int or float
+    w: int or float
+    h: int or float
     ftype: str
 
     def to_tuple(self):
