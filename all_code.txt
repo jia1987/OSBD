@@ -201,7 +201,7 @@ import numpy as np
 
 
 def dataset():
-    path = r'E:\study\My-GitHub-Project\漆包线检测\output\1'
+    path = r'\output\1'
     os.makedirs('cache\dataset', exist_ok=True)
     i = 0
     for p1, p2, p3 in os.walk(path):
@@ -4401,10 +4401,13 @@ import time, pickle
 import cv2, sys,os
 
 
-from fault_detection import detect
+from fault_detection import detect,DetectOutput
+from fault_detection.anaylsis import FaultEnum
 import numpy as np
 import multiprocessing.shared_memory as shm
 import argparse
+import onnxruntime as ort
+from ultralytics import YOLO
 from PIL import Image
 
 WRITE_FINISHED_FLAG = 0
@@ -4422,7 +4425,7 @@ def get_args():
     args = parser.parse_args()
     return args
 
-
+USE_YOLO = True
 def main():
     args = get_args()
     width, height = args.width, args.height
@@ -4430,12 +4433,31 @@ def main():
     img_shm = shm.SharedMemory(name=args.img_shm_name)
     op_shm = shm.SharedMemory(name=args.op_shm_name)
     out_shm = shm.SharedMemory(name=args.out_shm_name)
+    if USE_YOLO:
+        model_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))),'_rc','yolo.onnx')
+        yolo = YOLO(model_path)
     while True:
         if op_shm.buf[WRITE_FINISHED_FLAG] != 1:
             time.sleep(0.001)
             continue
         img = np.ndarray((height, width), dtype=np.uint8, buffer=img_shm.buf).copy()
-        output = detect(img)
+
+        if USE_YOLO:
+            result = yolo(np.repeat(img[:, :, np.newaxis], 3, axis=-1), imgsz=320, verbose=False)
+            output = []
+            boxes = result[0].boxes.xywh.cpu().numpy()  # 转为numpy数组
+            confs = result[0].boxes.conf.cpu().numpy()
+            classes = result[0].boxes.cls.cpu().numpy()
+
+            for j, (box, conf, cls) in enumerate(zip(boxes, confs, classes)):
+                # print(box, conf, cls)
+                output.append(DetectOutput(x=float(box[0]), y=float(box[1]), w=float(box[2]), h=float(box[3]),
+                                           ftype=(FaultEnum.Bubble,
+                                                  FaultEnum.Particle,
+                                                  FaultEnum.Tumor,
+                                                  FaultEnum.Sticky_Line)[int(cls)], ))
+        else:
+            output = detect(img)
 
         # 回传
         data_bytes = pickle.dumps([o.to_dict() for o in output])
@@ -4521,6 +4543,7 @@ class ChannelInfo():
     detect_image: np.ndarray = None
     show_image: np.ndarray = None
     faults: List[DetectOutput] = None
+    position:float = 0.0
 
     def clear(self):
         self.oringe_image = None
@@ -4533,6 +4556,7 @@ class ChannelInfo():
         raise NotImplementedError
 
 
+
 @dataclass
 class FaultInfo():
     image: np.ndarray = None
@@ -4541,6 +4565,7 @@ class FaultInfo():
     location: float = None
     batchName: str = None
     camera: str = None
+    sampler: str = None
     worker: str = None
 
     @classmethod
@@ -4909,7 +4934,9 @@ class SaveMixin():
 
 
             with open(os.path.join(save_path, f'fault.json'), 'w', encoding='utf-8') as f:
+                print(fault.to_dict())
                 json.dump(fault.to_dict(), f, ensure_ascii=False, indent=4)
+
             fault.saveImage(os.path.join(save_path, f'image.jpg'))
 
 
@@ -5068,7 +5095,7 @@ import threading
 import time
 from multiprocessing import shared_memory
 from os import times_result
-from typing import List
+from typing import List,Iterable
 
 import numpy as np
 
@@ -5176,6 +5203,8 @@ class FaultDetectionPipeline(SettingMixin, PrepareMixin, SaveMixin, VSamplerMixi
         self._accumulatedDistance_for_batch = 0
         # 处理的fps
         self._process_time = None
+        # 最后处理的缺陷
+        self._last_faults = None
 
     def start(self):
         """ start detection pipeline """
@@ -5198,16 +5227,7 @@ class FaultDetectionPipeline(SettingMixin, PrepareMixin, SaveMixin, VSamplerMixi
 
     def _image_detect_thread(self):
         """ 检测线程: 对于四个通道的摄像头数据进行图像处理"""
-        while True:
-            # ------
-            # 是否启动了检测功能
-            # ----
-            if not self.isDetectEnabled():
-                self.setState(state=self.State_DetectDisable)
-                time.sleep(0.1)
-                continue
-
-            st = time.time()
+        def detect_image():
             # ===========================
             # 读取图片, 图像识别
             # ==========================
@@ -5237,21 +5257,63 @@ class FaultDetectionPipeline(SettingMixin, PrepareMixin, SaveMixin, VSamplerMixi
 
             # save
             # 如果没有设置批次则不保存
-            if self.batchName() is None or self.batchName() == '':
-                self.setState(state=SettingMixin.State_NoBacthName)
-            else:
-                for k, v in self.channel_bus.items():
-                    info = self.channel_bus[k]
-                    # print(info)
-                    if len(info.faults) == 0: continue
-                    self.save(fault=FaultInfo(image=info.detect_image,
-                                              faults=info.faults,
-                                              location=self.accumulatedDistance(obj='batch'),
-                                              batchName=self.batchName(),
-                                              worker=self.workerName(),
-                                              camera=k, ))
-                # 结束
-                self.setState(state=SettingMixin.State_Normal)
+            result = []
+            for k, v in self.channel_bus.items():
+                info = self.channel_bus[k]
+                if len(info.faults) == 0: continue
+                result.append(FaultInfo(image=info.detect_image,
+                                        faults=info.faults,
+                                        location=self.accumulatedDistance(obj='batch'),
+                                        batchName=self.batchName(),
+                                        worker=self.workerName(),
+                                        sampler=k,
+                                        camera=k, ))
+
+
+            return result
+
+
+        def detect_lightning():
+            # 读取结果
+            output = self.lightningOutput()
+            output.distance = self.accumulatedDistance(obj='batch')
+            result = []
+            if output.fault:  # <--存在缺陷
+                result.append(FaultInfo(camera='lightning',
+                                        faults=[DetectOutput(0, 0, 0, 0, ftype='针孔缺陷')],
+                                        location=output.distance,
+                                        batchName=self.batchName(),
+                                        sampler="放电检测",
+                                        worker=self.workerName()))
+                # sleep
+                time.sleep(0.3)
+                self.clearLightningOutput()
+            return result
+
+        while True:
+            # ------
+            # 是否启动了检测功能
+            # ----
+            if not self.isDetectEnabled():
+                self.setState(state=self.State_DetectDisable)
+                time.sleep(0.1)
+                continue
+            st = time.time()
+            # -----  core ----
+            result = []
+            result += detect_image()
+            result += detect_lightning()
+            self._last_faults = result
+            # 回调
+            if len(result) != 0:
+                self.callback()()
+
+            # 保存
+            post_fix = f', 无保存'
+            if self.batchName() is not None and self.batchName() != '':
+                for f in result: self.save(fault=f)
+                post_fix = f', 保存至{self.batchName()}'
+            self.setState(state=SettingMixin.State_Normal + post_fix)
 
             # 如果没有读取到数据,睡眠, 不要阻塞UI线程
             interval = time.time() - st
@@ -5265,27 +5327,13 @@ class FaultDetectionPipeline(SettingMixin, PrepareMixin, SaveMixin, VSamplerMixi
             # 是否启动了检测功能
             # ----
             if not self.isDetectEnabled():
-                self.setState(state=self.State_DetectDisable)
+                # self.setState(state=self.State_DetectDisable)
                 time.sleep(0.1)
                 continue
             # 没有启动放电检测, 不用进行读取
             st = time.time()
 
-            # 读取结果
-            output = self.lightningOutput()
-            output.distance = self.accumulatedDistance(obj='batch')
-            if output.fault:  # <--存在缺陷
-                if not (self.batchName() is None or self.batchName() == ''):
-                    self.save(fault=FaultInfo(camera='lightning',
-                                              faults=[DetectOutput(0, 0, 0, 0, ftype='针孔缺陷')],
-                                              location=output.distance,
-                                              batchName=self.batchName(),
-                                              worker=self.workerName()))
-                # 回调
-                self.callback()()
-                # sleep
-                time.sleep(0.3)
-                self.clearLightningOutput()
+
             # 如果没有读取到数据,睡眠, 不要阻塞UI线程
             if (sleep_time := 0.03 - (time.time() - st)) > 0: time.sleep(sleep_time)
 
@@ -5307,6 +5355,10 @@ class FaultDetectionPipeline(SettingMixin, PrepareMixin, SaveMixin, VSamplerMixi
     def pipelineState(self) -> str:
         """ 管线的当前状态 """
         return self._pipeline_state
+
+    def lastFault(self)->Iterable[FaultInfo]:
+        return self._last_faults
+
 
 
 faultDetectionPipeline = None
@@ -6039,6 +6091,7 @@ class FaultEnum():
     Sticky_Line = '毛粘线'
     Bubble = '汽包'
     Particle = '粒子'
+    Tumor= '漆瘤'
 
 
 @dataclass
@@ -6388,10 +6441,10 @@ u = 1
 
 @dataclass
 class DetectOutput:
-    x: int
-    y: int
-    w: int
-    h: int
+    x: int or float
+    y: int or float
+    w: int or float
+    h: int or float
     ftype: str
 
     def to_tuple(self):
@@ -8589,12 +8642,13 @@ class Panel(QWidget):
 ================================================================================
 FILE: ./view\companent\pipline_pixmap_label.py
 ================================================================================
-import time, cv2
+import time, cv2, os, json
 import numpy as np
 from PyQt5.QtWidgets import QLabel, QFontDialog
 from PyQt5.QtGui import QPaintEvent, QPixmap, QPainter, QColor, QFontMetrics, QImage
 from PyQt5.QtCore import Qt, QRectF, QPointF, pyqtSignal, QPoint
 from core import faultDetectionPipeline, ChannelInfo
+from core.pipeline import FaultInfo
 from core import utils
 from .font import getFont
 from functools import lru_cache
@@ -8614,14 +8668,14 @@ def _build_lut(colormap: str):
             b = 100 * x + 20
 
         elif colormap == "jet":
-            r = min(max(1.5 - abs(4*x - 3), 0), 1) * 255
-            g = min(max(1.5 - abs(4*x - 2), 0), 1) * 255
-            b = min(max(1.5 - abs(4*x - 1), 0), 1) * 255
+            r = min(max(1.5 - abs(4 * x - 3), 0), 1) * 255
+            g = min(max(1.5 - abs(4 * x - 2), 0), 1) * 255
+            b = min(max(1.5 - abs(4 * x - 1), 0), 1) * 255
 
         elif colormap == "hot":
-            r = min(1, 3*x) * 255
-            g = min(1, max(0, 3*x - 1)) * 255
-            b = min(1, max(0, 3*x - 2)) * 255
+            r = min(1, 3 * x) * 255
+            g = min(1, max(0, 3 * x - 1)) * 255
+            b = min(1, max(0, 3 * x - 2)) * 255
 
         elif colormap == "cool":
             r = x * 255
@@ -8639,6 +8693,7 @@ def _build_lut(colormap: str):
 
     return table
 
+
 class PipelinePixmapLabelBase(QLabel):
     """ Base: 管线图像处理部分的显示Label """
     clicked = pyqtSignal(QPoint)
@@ -8655,8 +8710,6 @@ class PipelinePixmapLabelBase(QLabel):
         img.setColorTable(_build_lut(colormap))
 
         return QPixmap.fromImage(img)
-
-
 
     def __init__(self, ctx: str, parent=None):
         self._ctx = ctx
@@ -8756,6 +8809,58 @@ class PipelineResultLabel(PipelinePixmapLabelBase):
                                      offset.y() + fault.y * raito - self._fm.descent() * 1.2),
                              fault.ftype)
         return True
+
+
+class ResultLabel(QLabel):
+    """ 图像识别结果 """
+
+    def __init__(self, parent=None):
+        super(ResultLabel, self).__init__(parent)
+        self._pixmap = None
+        self._font = getFont(12)
+        self._fm = QFontMetrics(self._font)
+
+    def setResult(self, path):
+        # 可能不存在, 不存在则跳过
+        if not os.path.exists(path):
+            self._pixmap = None
+        else:
+            self._pixmap = QPixmap(os.path.join(path, 'image.jpg'))
+            self._pixmap = PipelinePixmapLabelBase.apply_colormap_to_pixmap(pixmap=self._pixmap)
+            print(123123)
+            with open(os.path.join(path, 'fault.json'), 'r', encoding='utf-8') as f:
+                faults = json.load(f)
+                self._faults = FaultInfo.from_dict(**faults)
+        self.update()
+
+    def paintEvent(self, event: QPaintEvent):
+        super(ResultLabel, self).paintEvent(event)
+        if self._pixmap is None:
+            return
+
+        if self._pixmap.size() != self.size():
+            resized_image: QPixmap = self._pixmap.scaled(self.size(), Qt.KeepAspectRatio)
+        else:
+            resized_image = self._pixmap
+
+        # draw to gui
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        res = self.size() - resized_image.size()
+        raito = resized_image.width() / self._pixmap.width()
+        offset = QPointF(res.width() // 2, res.height() // 2, )
+        # draw
+        painter.drawPixmap(offset, resized_image)
+        painter.setPen(Qt.red)
+        for fault in self._faults.faults:
+            painter.drawRect(QRectF(offset.x() + fault.x * raito, offset.y() + fault.y * raito,
+                                    fault.w * raito, fault.h * raito))
+            painter.drawText(QPointF(offset.x() + fault.x * raito,
+                                     offset.y() + fault.y * raito - self._fm.descent() * 1.2),
+                             fault.ftype)
+
+    def _info_process(self, info: ChannelInfo) -> QPixmap:
+        raise NotImplementedError()
 
 
 ================================================================================
@@ -9117,7 +9222,7 @@ FILE: ./view\companent\__init__.py
 from .panel import Panel
 from .pivot import Pivot
 from .icon import Icon
-from .pipline_pixmap_label import PipelineCameraLabel, PipelineResultLabel
+from .pipline_pixmap_label import PipelineCameraLabel, PipelineResultLabel, ResultLabel
 from .label import Label
 from .mask_box import MaskBox
 from .rangle_slider import RangeSlider
@@ -9610,28 +9715,9 @@ from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QStackedWidget, QWidget
 from core import faultDetectionPipeline
 from ...companent import Label, Pivot, EdgegWidget, PushButton
 from ...companent import PipelineCameraLabel, PipelineResultLabel, MaskBox
+from .fault_view import FaultView
 
 
-class FaultView(QWidget):
-    def __init__(self, parent=None):
-        super(FaultView, self).__init__(parent)
-        self.returnBtn = PushButton(parent=self, text=self.tr("返回"))
-        self.mainLayout = QVBoxLayout(self)
-        self.viewLayout = QVBoxLayout()
-        self.hlayout = QHBoxLayout()
-        self.mainLayout.addLayout(self.viewLayout)
-        self.mainLayout.addLayout(self.hlayout)
-        self.mainLayout.setStretch(0, 1)
-        self.mainLayout.setStretch(1, 0)
-        self.hlayout.addSpacerItem(QSpacerItem(0, 0, QSizePolicy.Expanding, QSizePolicy.Minimum))
-        self.hlayout.addWidget(self.returnBtn)
-        self.hlayout.addSpacerItem(QSpacerItem(0, 0, QSizePolicy.Expanding, QSizePolicy.Minimum))
-        self.hlayout.setStretch(0, 1)
-        self.hlayout.setStretch(1, 1)
-        self.hlayout.setStretch(2, 1)
-        self.returnBtn.setFixedHeight(64)
-
-        self.returnBtn.clicked.connect(self.close)
 
 
 class CameraDisplayInterface(EdgegWidget):
@@ -9987,6 +10073,45 @@ class OnlineFaultOverview(FaultOverview):
 
 
 ================================================================================
+FILE: ./view\interface\detection_interface\fault_view.py
+================================================================================
+from functools import partial
+from typing import List
+
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QFont
+from PyQt5.QtWidgets import QGridLayout, QSizePolicy, QSpacerItem
+from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QStackedWidget, QWidget
+
+from core import faultDetectionPipeline
+from ...companent import Label, Pivot, EdgegWidget, PushButton
+from ...companent import PipelineCameraLabel, PipelineResultLabel, MaskBox
+
+
+class FaultView(QWidget):
+    def __init__(self, parent=None):
+        super(FaultView, self).__init__(parent)
+        self.returnBtn = PushButton(parent=self, text=self.tr("返回"))
+        self.mainLayout = QVBoxLayout(self)
+        self.viewLayout = QVBoxLayout()
+        self.hlayout = QHBoxLayout()
+        self.mainLayout.addLayout(self.viewLayout)
+        self.mainLayout.addLayout(self.hlayout)
+        self.mainLayout.setStretch(0, 1)
+        self.mainLayout.setStretch(1, 0)
+        self.hlayout.addSpacerItem(QSpacerItem(0, 0, QSizePolicy.Expanding, QSizePolicy.Minimum))
+        self.hlayout.addWidget(self.returnBtn)
+        self.hlayout.addSpacerItem(QSpacerItem(0, 0, QSizePolicy.Expanding, QSizePolicy.Minimum))
+        self.hlayout.setStretch(0, 1)
+        self.hlayout.setStretch(1, 1)
+        self.hlayout.setStretch(2, 1)
+        self.returnBtn.setFixedHeight(64)
+
+        self.returnBtn.clicked.connect(self.close)
+
+
+
+================================================================================
 FILE: ./view\interface\detection_interface\info.py
 ================================================================================
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QGridLayout, QPushButton
@@ -10068,17 +10193,21 @@ class LightnInterface(LightnInterface):
 ================================================================================
 FILE: ./view\interface\detection_interface\project_infomation.py
 ================================================================================
+import os.path
+
+
 from PyQt5.QtGui import QIcon, QStandardItemModel, QStandardItem
-from PyQt5.QtCore import pyqtSlot, QTimer
+from PyQt5.QtCore import pyqtSlot, QTimer,Qt
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QGridLayout, QPushButton, QLabel, QLineEdit, QSpacerItem, QSizePolicy
 from PyQt5.QtWidgets import QTableView, QHeaderView
 from core.signal_bus import SignalBus
-from view.companent import PipelineCameraLabel, PipelineResultLabel, Label
+from view.companent import PipelineCameraLabel, PipelineResultLabel, Label,ResultLabel
 from typing import List
-from PyQt5.QtWidgets import QMainWindow, QHBoxLayout, QVBoxLayout, QStackedWidget, QFrame, QWidget
+from PyQt5.QtWidgets import QMainWindow, QAbstractItemView, QVBoxLayout, QStackedWidget, QFrame, QWidget
 from core import faultDetectionPipeline
-from ...companent import Label, EdgegWidget,TableView
-
+from core.const import Path
+from ...companent import Label, EdgegWidget,TableView,MaskBox
+from .fault_view import FaultView
 
 class BatchInfomationWidget(EdgegWidget):
     def __init__(self, parent):
@@ -10091,7 +10220,7 @@ class BatchInfomationWidget(EdgegWidget):
         self.batch_name_label = Label(text='检查结果:', fontSize=16, parent=self)
         self.table_view = TableView(self)
         self.table_view.setFrameShape(QFrame.NoFrame)
-        self.table_view.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table_view.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table_view.verticalHeader().setHidden(True)
         # the model of table view
         self.model = QStandardItemModel()
@@ -10111,21 +10240,48 @@ class BatchInfomationWidget(EdgegWidget):
             lambda: self.batch_name_label.setText(self.tr('检查结果:') + faultDetectionPipeline.batchName()))
         SignalBus.batchUpdated.connect(lambda :self.model.clear())
         SignalBus.faultUpdated.connect(self._onFaultUpdated)
+        # table clicked
+        self.table_view.clicked.connect(self._onTableViewClicked)
 
     def _onFaultUpdated(self):
         distance = faultDetectionPipeline.accumulatedDistance(obj='batch')
-        for ctx, sampler_name in zip(faultDetectionPipeline.CHANNELS, ('相机左', '相机上', '相机右', '相机下')):
-            camera = faultDetectionPipeline.channels(ctx=ctx)
-            if camera.faults is None: continue
-            if len(camera.faults) == 0: continue
-            # add item
-            faults = tuple({f.ftype for f in camera.faults})
-            fualts_string = ','.join(faults[:min(len(faults), 3)]) + ('...' if len(faults) > 3 else '')
+        for fault in faultDetectionPipeline.lastFault():
+            for f in fault.faults:
+                fualts_string = ','.join(f.ftype[:min(len(f.ftype), 3)]) + ('...' if len(f.ftype) > 3 else '')
+                sampler_name = fault.sampler
 
-            rowCount = self.model.rowCount()
-            self.model.setItem(rowCount, 0, QStandardItem(f'{distance:.2f}'))
-            self.model.setItem(rowCount, 1, QStandardItem(sampler_name))
-            self.model.setItem(rowCount, 2, QStandardItem(fualts_string))
+                rowCount = self.model.rowCount()
+                item = QStandardItem(f'{distance:.2f}')
+                item.setData(faultDetectionPipeline.batchName(), Qt.UserRole)
+                self.model.setItem(rowCount, 0, item)
+                self.model.setItem(rowCount, 1, QStandardItem(sampler_name))
+                self.model.setItem(rowCount, 2, QStandardItem(fualts_string))
+
+
+
+
+    def _onTableViewClicked(self, index):
+        """ event """
+
+        row = index.row()
+
+        distance = self.model.item(row, 0).text()
+        batchName = self.model.item(row, 0).data(Qt.UserRole)
+        sensor = self.model.item(row, 1).text()
+        fault = self.model.item(row, 2).text()
+
+        if batchName is None:
+            return
+
+        view = FaultView()
+        view.label = ResultLabel(parent=view)
+        view.label.setResult(os.path.join(Path.OUTPUT_DIR,batchName,distance,sensor))
+        view.viewLayout.addWidget(view.label)
+
+        # mask
+        w = MaskBox(parent=self.window())
+        w.setWidget(widget=view)
+        w.exec()
 
 
 ================================================================================
@@ -10432,7 +10588,6 @@ from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QStackedWidget, Q
 from PyQt5.QtWidgets import QApplication, QMainWindow, QListView
 
 from ...companent import Label, Pivot, FaultOverview
-from .image import ResultLabel
 from .vision import VisionDetectWidgwt
 from .navigation import Navigation
 from .fault_overview import BatchFaultOverview
@@ -10551,57 +10706,57 @@ from core.pipeline import FaultInfo
 from ...companent.font import getFont
 from ...companent.pipline_pixmap_label import PipelinePixmapLabelBase
 
-
-class ResultLabel(QLabel):
-    """ 图像识别结果 """
-    def __init__(self, parent=None):
-        super(ResultLabel, self).__init__(parent)
-        self._pixmap = None
-        self._font = getFont(12)
-        self._fm = QFontMetrics(self._font)
-
-    def setResult(self, path):
-        # 可能不存在, 不存在则跳过
-        if not os.path.exists(path):
-            self._pixmap = None
-        else:
-            self._pixmap = QPixmap(os.path.join(path, 'image.jpg'))
-            self._pixmap =  PipelinePixmapLabelBase.apply_colormap_to_pixmap(pixmap=self._pixmap)
-
-            with open(os.path.join(path, 'fault.json'), 'r', encoding='utf-8') as f:
-                faults = json.load(f)
-                self._faults = FaultInfo.from_dict(**faults)
-        self.update()
-
-    def paintEvent(self, event: QPaintEvent):
-        super(ResultLabel, self).paintEvent(event)
-        if self._pixmap is None:
-            return
-
-        if self._pixmap.size() != self.size():
-            resized_image: QPixmap = self._pixmap.scaled(self.size(), Qt.KeepAspectRatio)
-        else:
-            resized_image = self._pixmap
-
-
-        # draw to gui
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
-        res = self.size() - resized_image.size()
-        raito = resized_image.width() / self._pixmap.width()
-        offset = QPointF(res.width() // 2, res.height() // 2, )
-        # draw
-        painter.drawPixmap(offset, resized_image)
-        painter.setPen(Qt.red)
-        for fault in self._faults.faults:
-            painter.drawRect(QRectF(offset.x() + fault.x * raito, offset.y() + fault.y * raito,
-                                    fault.w * raito, fault.h * raito))
-            painter.drawText(QPointF(offset.x() + fault.x * raito,
-                                     offset.y() + fault.y * raito - self._fm.descent() * 1.2),
-                             fault.ftype)
-
-    def _info_process(self, info: ChannelInfo) -> QPixmap:
-        raise NotImplementedError()
+#
+# class ResultLabel(QLabel):
+#     """ 图像识别结果 """
+#     def __init__(self, parent=None):
+#         super(ResultLabel, self).__init__(parent)
+#         self._pixmap = None
+#         self._font = getFont(12)
+#         self._fm = QFontMetrics(self._font)
+#
+#     def setResult(self, path):
+#         # 可能不存在, 不存在则跳过
+#         if not os.path.exists(path):
+#             self._pixmap = None
+#         else:
+#             self._pixmap = QPixmap(os.path.join(path, 'image.jpg'))
+#             self._pixmap =  PipelinePixmapLabelBase.apply_colormap_to_pixmap(pixmap=self._pixmap)
+#
+#             with open(os.path.join(path, 'fault.json'), 'r', encoding='utf-8') as f:
+#                 faults = json.load(f)
+#                 self._faults = FaultInfo.from_dict(**faults)
+#         self.update()
+#
+#     def paintEvent(self, event: QPaintEvent):
+#         super(ResultLabel, self).paintEvent(event)
+#         if self._pixmap is None:
+#             return
+#
+#         if self._pixmap.size() != self.size():
+#             resized_image: QPixmap = self._pixmap.scaled(self.size(), Qt.KeepAspectRatio)
+#         else:
+#             resized_image = self._pixmap
+#
+#
+#         # draw to gui
+#         painter = QPainter(self)
+#         painter.setRenderHint(QPainter.Antialiasing)
+#         res = self.size() - resized_image.size()
+#         raito = resized_image.width() / self._pixmap.width()
+#         offset = QPointF(res.width() // 2, res.height() // 2, )
+#         # draw
+#         painter.drawPixmap(offset, resized_image)
+#         painter.setPen(Qt.red)
+#         for fault in self._faults.faults:
+#             painter.drawRect(QRectF(offset.x() + fault.x * raito, offset.y() + fault.y * raito,
+#                                     fault.w * raito, fault.h * raito))
+#             painter.drawText(QPointF(offset.x() + fault.x * raito,
+#                                      offset.y() + fault.y * raito - self._fm.descent() * 1.2),
+#                              fault.ftype)
+#
+#     def _info_process(self, info: ChannelInfo) -> QPixmap:
+#         raise NotImplementedError()
 
 
 ================================================================================
@@ -10617,7 +10772,7 @@ from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QStackedWidget, Q
 from PyQt5.QtWidgets import QApplication, QMainWindow, QListView
 
 from ...companent import Label, Pivot, LightnInterface, FaultOverview
-from .image import ResultLabel
+
 from .vision import VisionDetectWidgwt
 from .navigation import Navigation
 from .fault_overview import BatchFaultOverview
@@ -10785,8 +10940,8 @@ from PyQt5.QtGui import QStandardItemModel, QStandardItem
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QStackedWidget, QListView, QGridLayout
 from PyQt5.QtWidgets import QApplication, QMainWindow, QListView
 
-from ...companent import Label, Pivot,LightnInterface,EdgegWidget
-from .image import ResultLabel
+from ...companent import Label, Pivot,LightnInterface,EdgegWidget,ResultLabel
+# from .image import ResultLabel
 from core.const import Path
 from core.pipeline import faultDetectionPipeline
 
