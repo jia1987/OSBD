@@ -47,6 +47,8 @@ def main():
             result = yolo(np.repeat(img[:, :, np.newaxis], 3, axis=-1), imgsz=320, verbose=False)
             output = []
             boxes = result[0].boxes.xywh.cpu().numpy()  # 转为numpy数组
+            boxes[:, 0] = boxes[:, 0] - boxes[:, 2] / 2
+            boxes[:, 1] = boxes[:, 1] - boxes[:, 3] / 2
             confs = result[0].boxes.conf.cpu().numpy()
             classes = result[0].boxes.cls.cpu().numpy()
 

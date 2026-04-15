@@ -62,6 +62,7 @@ lib.WY_ClrInterruptFallPort0.restype = ctypes.c_int
 
 
 class IOCard():
+    WARNING_IDX = 8
     __cards = {}
 
     @staticmethod

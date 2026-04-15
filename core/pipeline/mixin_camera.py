@@ -141,3 +141,6 @@ class CameraMixin():
     def isLightSourceEnabled(self) -> bool:
         """ 光源是否使能 """
         return self._light_source is not None
+
+    def IOCard(self)->IOCard:
+        return self._io_card
