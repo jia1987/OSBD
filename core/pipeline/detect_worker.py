@@ -1,19 +1,28 @@
 import time, pickle
-import cv2, sys,os
+import cv2, sys, os
 
-
-from fault_detection import detect,DetectOutput
+from fault_detection import detect, DetectOutput
 from fault_detection.anaylsis import FaultEnum
 import numpy as np
 import multiprocessing.shared_memory as shm
 import argparse
-import onnxruntime as ort
 from ultralytics import YOLO
-from PIL import Image
+import cpuinfo
+
+info = cpuinfo.get_cpu_info()
+brand = info['brand_raw']
+print("CPU:", brand)
+IS_INTEL = "Intel" in brand
 
 WRITE_FINISHED_FLAG = 0
 DETECT_FINISHED_FLAG = 1
 
+IMG_SIZE = 640
+height = IMG_SIZE
+width = IMG_SIZE // 3
+imgsz = (640, 224)
+h = imgsz[0]
+w = imgsz[1]
 
 def get_args():
     parser = argparse.ArgumentParser(description="Simple example of a training script.")
@@ -26,7 +35,10 @@ def get_args():
     args = parser.parse_args()
     return args
 
+
 USE_YOLO = True
+if USE_YOLO and IS_INTEL:
+    import openvino as ov
 def main():
     args = get_args()
     width, height = args.width, args.height
@@ -35,16 +47,29 @@ def main():
     op_shm = shm.SharedMemory(name=args.op_shm_name)
     out_shm = shm.SharedMemory(name=args.out_shm_name)
     if USE_YOLO:
-        model_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))),'_rc','yolo.onnx')
-        yolo = YOLO(model_path)
+        model_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), '_rc')
+        if IS_INTEL:
+            yolo = YOLO(os.path.join(model_path, 'yolo_openvino_model'))
+        else:
+            yolo = YOLO(os.path.join(model_path, 'yolo.onnx'))
+
     while True:
         if op_shm.buf[WRITE_FINISHED_FLAG] != 1:
             time.sleep(0.001)
             continue
-        img = np.ndarray((height, width), dtype=np.uint8, buffer=img_shm.buf).copy()
+
+        img = np.ndarray((height, width), dtype=np.uint8, buffer=img_shm.buf)
 
         if USE_YOLO:
-            result = yolo(np.repeat(img[:, :, np.newaxis], 3, axis=-1), imgsz=320, verbose=False)
+            # if IS_INTEL:
+            #     img = cv2.resize(img, (w, h))
+            #     img = np.repeat(img[np.newaxis,:, :,], 3, axis=0)[np.newaxis]
+            #     result = yolo([img])[output_layer]
+            #     print(result)
+            # else:
+            #     yolo.__call__
+            img = np.repeat(img[:, :, np.newaxis], 3, axis=-1)
+            result = yolo(img,imgsz=imgsz, verbose=False)
             output = []
             boxes = result[0].boxes.xywh.cpu().numpy()  # 转为numpy数组
             boxes[:, 0] = boxes[:, 0] - boxes[:, 2] / 2
