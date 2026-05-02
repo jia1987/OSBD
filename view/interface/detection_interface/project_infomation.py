@@ -11,7 +11,7 @@ from typing import List
 from PyQt5.QtWidgets import QMainWindow, QAbstractItemView, QVBoxLayout, QStackedWidget, QFrame, QWidget
 from core import faultDetectionPipeline
 from core.const import Path
-from ...companent import Label, EdgegWidget,TableView,MaskBox
+from ...companent import Label, EdgegWidget,TableView,MaskBox,ResultEditWidget
 from .fault_view import FaultView
 
 class BatchInfomationWidget(EdgegWidget):
@@ -79,7 +79,7 @@ class BatchInfomationWidget(EdgegWidget):
             return
 
         view = FaultView()
-        view.label = ResultLabel(parent=view)
+        view.label = ResultEditWidget(parent=view)
         view.label.setResult(os.path.join(Path.OUTPUT_DIR,batchName,distance,sensor))
         view.viewLayout.addWidget(view.label)
 

@@ -66,10 +66,12 @@ class IOCard():
     __cards = {}
 
     @staticmethod
-    def to8bit(ch0: int = None, ch1: int = None, ch2: int = None, ch3: int = None,
-               ch4: int = None, ch5: int = None, ch6: int = None, ch7: int = None,
-               revise=False):
-        chs = (ch7, ch6, ch5, ch4, ch3, ch2, ch1, ch0)
+    def to16bit(ch0: int = None, ch1: int = None, ch2: int = None, ch3: int = None,
+                ch4: int = None, ch5: int = None, ch6: int = None, ch7: int = None,
+                ch8: int = None, ch9: int = None, ch10: int = None, ch11: int = None,
+                ch12: int = None, ch13: int = None, ch14: int = None, ch15: int = None,
+                revise=False):
+        chs = (ch15, ch14, ch13, ch12, ch11, ch10, ch9, ch8, ch7, ch6, ch5, ch4, ch3, ch2, ch1, ch0)
         if revise:
             string = int("".join(['0' if c == 1 else '1' for c in chs]), 2)
         else:
@@ -95,9 +97,9 @@ class IOCard():
         self._enable = self.open() > number
         # assert self.open() > number
         self._number = number
-        self._output_chs = [0, 0, 0, 0, 0, 0, 0, 0]
-        self._rise_interrupt_enable = [0, 0, 0, 0, 0, 0, 0, 0]
-        self._fall_interrupt_enable = [0, 0, 0, 0, 0, 0, 0, 0]
+        self._output_chs = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        self._rise_interrupt_enable = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        self._fall_interrupt_enable = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         self._interrupt_callback_pool: List[Callable] = []
         self.setOutPutData()
 
@@ -119,11 +121,15 @@ class IOCard():
 
     def setOutPutData(self,
                       ch0: int = None, ch1: int = None, ch2: int = None, ch3: int = None,
-                      ch4: int = None, ch5: int = None, ch6: int = None, ch7: int = None):
+                      ch4: int = None, ch5: int = None, ch6: int = None, ch7: int = None,
+                      ch8: int = None, ch9: int = None, ch10: int = None, ch11: int = None,
+                      ch12: int = None, ch13: int = None, ch14: int = None, ch15: int = None
+                      ):
         if not self._enable: return -1
-        chs = [c1 if c2 is None else c2 for c1, c2 in zip(self._output_chs, (ch0, ch1, ch2, ch3, ch4, ch5, ch6, ch7,))]
+        chs = (ch0, ch1, ch2, ch3, ch4, ch5, ch6, ch7, ch8, ch9, ch10, ch11, ch12, ch13, ch14, ch15)
+        chs = [c1 if c2 is None else c2 for c1, c2 in zip(self._output_chs, chs)]
         self._output_chs = chs
-        string = self.to8bit(*chs, revise=True)
+        string = self.to16bit(*chs, revise=True)
         ret = lib.WY_SetOutPutData(self._number, string)
         assert ret == 0, 'ret'
         return ret
@@ -135,24 +141,32 @@ class IOCard():
         mask = data.value
         return [(mask >> i) & 1 for i in range(8)]
 
-    def setRiseInterrupEnbale(self, ch0: int = None, ch1: int = None, ch2: int = None, ch3: int = None,
-                              ch4: int = None, ch5: int = None, ch6: int = None, ch7: int = None):
-        enable = [c1 if c2 is None else c2 for c1, c2 in zip(self._rise_interrupt_enable,
-                                                             (ch0, ch1, ch2, ch3, ch4, ch5, ch6, ch7,))]
+    def setRiseInterrupEnbale(self,
+                              ch0: int = None, ch1: int = None, ch2: int = None, ch3: int = None,
+                              ch4: int = None, ch5: int = None, ch6: int = None, ch7: int = None,
+                              ch8: int = None, ch9: int = None, ch10: int = None, ch11: int = None,
+                              ch12: int = None, ch13: int = None, ch14: int = None, ch15: int = None
+                              ):
+        chs = (ch0, ch1, ch2, ch3, ch4, ch5, ch6, ch7, ch8, ch9, ch10, ch11, ch12, ch13, ch14, ch15)
+        enable = [c1 if c2 is None else c2 for c1, c2 in zip(self._rise_interrupt_enable, chs)]
         self._rise_interrupt_enable = enable
         ret = lib.WY_SetInterruptPortEnable(self._number,
-                                            self.to8bit(*self._rise_interrupt_enable, revise=False),
-                                            self.to8bit(*self._fall_interrupt_enable, revise=False), )
+                                            self.to16bit(*self._rise_interrupt_enable, revise=False),
+                                            self.to16bit(*self._fall_interrupt_enable, revise=False), )
         assert ret == 0
 
-    def setFallInterrupEnbale(self, ch0: int = None, ch1: int = None, ch2: int = None, ch3: int = None,
-                              ch4: int = None, ch5: int = None, ch6: int = None, ch7: int = None):
-        enable = [c1 if c2 is None else c2 for c1, c2 in zip(self._fall_interrupt_enable,
-                                                             (ch0, ch1, ch2, ch3, ch4, ch5, ch6, ch7,))]
+    def setFallInterrupEnbale(self,
+                              ch0: int = None, ch1: int = None, ch2: int = None, ch3: int = None,
+                              ch4: int = None, ch5: int = None, ch6: int = None, ch7: int = None,
+                              ch8: int = None, ch9: int = None, ch10: int = None, ch11: int = None,
+                              ch12: int = None, ch13: int = None, ch14: int = None, ch15: int = None
+                              ):
+        chs = (ch0, ch1, ch2, ch3, ch4, ch5, ch6, ch7, ch8, ch9, ch10, ch11, ch12, ch13, ch14, ch15)
+        enable = [c1 if c2 is None else c2 for c1, c2 in zip(self._fall_interrupt_enable,chs)]
         self._fall_interrupt_enable = enable
         ret = lib.WY_SetInterruptPortEnable(self._number,
-                                            self.to8bit(*self._rise_interrupt_enable, revise=False),
-                                            self.to8bit(*self._fall_interrupt_enable, revise=False), )
+                                            self.to16bit(*self._rise_interrupt_enable, revise=False),
+                                            self.to16bit(*self._fall_interrupt_enable, revise=False), )
 
 
 if __name__ == "__main__":

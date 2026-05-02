@@ -16,3 +16,4 @@ from .spinbox import SpinBox,DoubleSpinBox
 from .list_widget import ListWidget,ListView
 from .table_widget import TabWidget,TableView
 from .line_edit import LineEdit
+from .result_edit_widget import ResultEditWidget

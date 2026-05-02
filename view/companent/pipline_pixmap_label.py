@@ -167,30 +167,31 @@ class PipelineResultLabel(PipelinePixmapLabelBase):
         return True
 
 
-class ResultLabel(QLabel):
+class ResultLabel(PipelinePixmapLabelBase):
     """ 图像识别结果 """
 
     def __init__(self, parent=None):
-        super(ResultLabel, self).__init__(parent)
+        super(QLabel, self).__init__(parent)
         self._pixmap = None
         self._font = getFont(12)
         self._fm = QFontMetrics(self._font)
+        self._readPath = None
 
     def setResult(self, path):
         # 可能不存在, 不存在则跳过
+        self._readPath = path
         if not os.path.exists(path):
             self._pixmap = None
         else:
             self._pixmap = QPixmap(os.path.join(path, 'image.jpg'))
             self._pixmap = PipelinePixmapLabelBase.apply_colormap_to_pixmap(pixmap=self._pixmap)
-            print(123123)
             with open(os.path.join(path, 'fault.json'), 'r', encoding='utf-8') as f:
                 faults = json.load(f)
                 self._faults = FaultInfo.from_dict(**faults)
         self.update()
 
     def paintEvent(self, event: QPaintEvent):
-        super(ResultLabel, self).paintEvent(event)
+        super(QLabel, self).paintEvent(event)
         if self._pixmap is None:
             return
 
@@ -217,3 +218,6 @@ class ResultLabel(QLabel):
 
     def _info_process(self, info: ChannelInfo) -> QPixmap:
         raise NotImplementedError()
+
+    def readPath(self)->str:
+        return self._readPath

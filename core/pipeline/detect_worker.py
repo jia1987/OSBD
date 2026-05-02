@@ -61,13 +61,7 @@ def main():
         img = np.ndarray((height, width), dtype=np.uint8, buffer=img_shm.buf)
 
         if USE_YOLO:
-            # if IS_INTEL:
-            #     img = cv2.resize(img, (w, h))
-            #     img = np.repeat(img[np.newaxis,:, :,], 3, axis=0)[np.newaxis]
-            #     result = yolo([img])[output_layer]
-            #     print(result)
-            # else:
-            #     yolo.__call__
+
             img = np.repeat(img[:, :, np.newaxis], 3, axis=-1)
             result = yolo(img,imgsz=imgsz, verbose=False)
             output = []
