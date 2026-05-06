@@ -2,7 +2,7 @@ from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtGui import QFontMetrics
 from PyQt5.QtWidgets import QTextEdit, QHBoxLayout
 from PyQt5.QtWidgets import QWidget, QPushButton, QFileDialog
-
+from .button import PushButton
 
 class FileLoadBox(QWidget):
     pathChanged = pyqtSignal(str)
@@ -14,7 +14,7 @@ class FileLoadBox(QWidget):
         self.textView = QTextEdit(self)
         self.textView.setAcceptRichText(False)
         self.textView.setEnabled(False)
-        self.btn = QPushButton(self)
+        self.btn = PushButton(self)
         self.btn.setText(self.tr("修改路径"))
 
         self.viewLayout = QHBoxLayout(self)
