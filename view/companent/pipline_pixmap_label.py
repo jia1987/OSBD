@@ -176,6 +176,8 @@ class ResultLabel(PipelinePixmapLabelBase):
         self._font = getFont(12)
         self._fm = QFontMetrics(self._font)
         self._readPath = None
+        self._offset = None
+        self._ratio = None
 
     def setResult(self, path):
         # 可能不存在, 不存在则跳过
@@ -206,6 +208,8 @@ class ResultLabel(PipelinePixmapLabelBase):
         res = self.size() - resized_image.size()
         raito = resized_image.width() / self._pixmap.width()
         offset = QPointF(res.width() // 2, res.height() // 2, )
+        self._offset = offset
+        self._ratio = raito
         # draw
         painter.drawPixmap(offset, resized_image)
         painter.setPen(Qt.red)
@@ -216,8 +220,17 @@ class ResultLabel(PipelinePixmapLabelBase):
                                      offset.y() + fault.y * raito - self._fm.descent() * 1.2),
                              fault.ftype)
 
+    def faultIn(self, pos: QPoint) -> int:
+        if self._offset is not None:
+            pos = pos - self._offset
+        ratio = 1 if (self._ratio is None) else self._ratio
+        for i, fault in enumerate(self._faults.faults):
+            if fault.x <= pos.x() / ratio <= fault.x + fault.w and fault.y <= pos.y() / ratio <= fault.y + fault.h:
+                return i
+        return -1
+
     def _info_process(self, info: ChannelInfo) -> QPixmap:
         raise NotImplementedError()
 
-    def readPath(self)->str:
+    def readPath(self) -> str:
         return self._readPath

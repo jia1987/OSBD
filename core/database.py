@@ -17,6 +17,13 @@ class Role(Enum):
     MANAGER = "manager"
     WORKER = "worker"
 
+    def e2c(self):
+        if self == Role.ADMIN:
+            return "管理员"
+        elif self == Role.MANAGER:
+            return "经理"
+        elif self == Role.WORKER:
+            return "工人"
 
 class Permission(Enum):
     CREATE_USER = "createUser"

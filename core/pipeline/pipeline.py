@@ -116,6 +116,9 @@ class FaultDetectionPipeline(SettingMixin, PrepareMixin, SaveMixin, VSamplerMixi
         self._process_time = None
         # 最后处理的缺陷
         self._last_faults = None
+        # 报警重置的定时器 3s
+        # 0 触发
+        self._warning_reset = threading.Timer(3,lambda :self._io_card.setOutPutData(ch8=1))
 
     def start(self):
         """ start detection pipeline """
@@ -217,6 +220,9 @@ class FaultDetectionPipeline(SettingMixin, PrepareMixin, SaveMixin, VSamplerMixi
             self._last_faults = result
             # 回调
             if len(result) != 0:
+                self._warning_reset.cancel()
+                self._io_card.setOutPutData(ch8=0)
+                self._warning_reset.start()
                 self.callback()()
 
             # 保存

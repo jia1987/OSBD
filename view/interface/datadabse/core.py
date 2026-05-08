@@ -1,11 +1,15 @@
+import os.path
+
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QListWidget,
     QMessageBox, QComboBox, QGroupBox, QFormLayout
 )
 from core.database import *
+from core.pipeline import FaultInfo
 from PyQt5.QtCore import Qt
-from ...companent import PushButton, ComboBox,LineEdit,ListWidget,UsersComboBox
+from ...companent import PushButton, ComboBox, LineEdit, ListWidget, UsersComboBox
+from core.const import Path
 
 
 # ==========================
@@ -64,11 +68,11 @@ class UserManagerWidget(QWidget):
         self.batchEdit = LineEdit()
         self.batchEdit.setPlaceholderText("输入批次名称")
 
-        #addBtn = PushButton(self, "添加批次")
-        #addBtn.clicked.connect(self._addBatch)
+        # addBtn = PushButton(self, "添加批次")
+        # addBtn.clicked.connect(self._addBatch)
 
         hLayout.addWidget(self.batchEdit)
-        #hLayout.addWidget(addBtn)
+        # hLayout.addWidget(addBtn)
         batchLayout.addLayout(hLayout)
 
         batchGroup.setLayout(batchLayout)
@@ -86,7 +90,7 @@ class UserManagerWidget(QWidget):
         self.newPwdEdit.setEchoMode(QLineEdit.Password)
 
         self.roleCombo = ComboBox()
-        self.roleCombo.addItems([r.value for r in Role])
+        self.roleCombo.setItems([r.e2c() for r in Role])
 
         createBtn = PushButton(self, "创建用户")
         createBtn.clicked.connect(self._createUser)
@@ -118,9 +122,28 @@ class UserManagerWidget(QWidget):
             QMessageBox.warning(self, "错误", data)
 
     def _refresh(self):
-        user = self.manager.getUser(self.currentUser["id"])
+        # user = self.manager.getUser(self.currentUser["id"])
         self.batchList.clear()
-        self.batchList.addItems(user["strList"])
+        items = []
+        for bn in os.listdir(Path.OUTPUT_DIR):
+            # batch name
+            batchp = os.path.join(Path.OUTPUT_DIR, bn)
+            # 0.0 0.1 0.3
+            a_fp = tuple(os.listdir(batchp))
+            if len(a_fp) == 0:
+                continue
+            a_fp = a_fp[0]
+            # fault
+            a_f = tuple(os.listdir(os.path.join(batchp, a_fp)))
+            if len(a_f) == 0:
+                continue
+            a_f = a_f[0]
+            fault_path = os.path.join(batchp, a_fp, a_f, 'fault.json')
+            if os.path.exists(fault_path):
+                with open(fault_path, "r", encoding="utf-8") as f:
+                    fault = FaultInfo.from_dict(**json.load(f))
+                    items.append(f"负责人:{fault.worker: ^30}批次:{bn: ^30}")
+            self.batchList.addItems(items)
 
     def _addBatch(self):
         if not self.currentUser:

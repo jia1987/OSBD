@@ -2,7 +2,7 @@ import time, cv2, os, json
 import numpy as np
 from PyQt5.QtWidgets import QLabel, QFontDialog, QWidget, QVBoxLayout, QHBoxLayout, QListWidgetItem
 from PyQt5.QtGui import QPaintEvent, QPixmap, QPainter, QColor, QFontMetrics, QImage
-from PyQt5.QtCore import Qt, QRectF, QPointF, pyqtSignal, QPoint
+from PyQt5.QtCore import Qt, QRectF, QPointF, pyqtSignal, QPoint, QEvent
 from core import faultDetectionPipeline, ChannelInfo
 from core.pipeline import FaultInfo
 from core import utils
@@ -11,7 +11,7 @@ from .pipline_pixmap_label import ResultLabel
 from .list_widget import ListWidget
 from .combox import ComboBox
 from .label import Label
-from .button import PushButton
+from .button import PushButton, ToolButton
 from functools import lru_cache
 from PyQt5.QtGui import QColor
 
@@ -21,8 +21,9 @@ class ResultEditWidget(QWidget):
 
     def __init__(self, parent=None):
         super(ResultEditWidget, self).__init__(parent)
-
+        self.closeBtn = PushButton(text=self.tr("退出"), parent=self)
         self.result_label = ResultLabel(self)
+        self.result_label.installEventFilter(self)
 
         self.list_widget = ListWidget()
         self.type_combo = ComboBox()
@@ -45,13 +46,18 @@ class ResultEditWidget(QWidget):
         right_layout.addWidget(self.info_label)
         right_layout.addStretch()
 
+        left_layout = QVBoxLayout()
+        left_layout.addWidget(self.closeBtn,0)
+        left_layout.addWidget(self.result_label,1)
+
         main_layout = QHBoxLayout(self)
-        main_layout.addWidget(self.result_label, 3)
-        main_layout.addLayout(right_layout, 1)
+        main_layout.addLayout(left_layout, 1)
+        main_layout.addLayout(right_layout, 3)
 
         # signals
         self.list_widget.itemClicked.connect(lambda item: self._select_fault(item.data(Qt.UserRole)))
         self.btn_apply.clicked.connect(self._apply_change)
+        self.closeBtn.clicked.connect(self.close)
 
         # 连接 resultlabel 点击（通过 monkey patch）
         # self.result_label.mousePressEvent = self._label_mouse_press
@@ -69,12 +75,11 @@ class ResultEditWidget(QWidget):
                 item.setData(Qt.UserRole, f)
                 self.list_widget.addItem(item)
 
-    # def _label_mouse_press(self, event):
-    #     """ click image """
-    #     self.result_label.mousePressEvent(event)
-    #
-    #     if self.result_label._selected_fault:
-    #         self._select_fault(self.result_label._selected_fault)
+    def eventFilter(self, obj, e):
+        if e.type() == QEvent.MouseButtonRelease and obj is self.result_label:
+            i = self.result_label.faultIn(pos=e.pos())
+            self._select_fault(fault=self._faults.faults[i])
+        return False
 
     def _select_fault(self, fault):
         """ select fault """
@@ -91,7 +96,6 @@ class ResultEditWidget(QWidget):
             )
             self.info_label.update()
         super(ResultEditWidget, self).update()
-
 
     def _apply_change(self):
         """ apply change """
