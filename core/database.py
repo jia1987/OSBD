@@ -7,6 +7,8 @@ import datetime
 from enum import Enum
 from threading import Lock
 
+from .const import Path
+
 
 # ==========================
 # 枚举定义
@@ -47,7 +49,8 @@ class Permission(Enum):
 class UserManager:
     _instance = None
     _lock = Lock()
-    dbName = os.path.join(os.path.dirname(os.curdir), 'config', "users.db")
+    # 固定在程序根目录的 config 下, 不依赖当前工作目录
+    dbName = os.path.join(Path.CONFIG_DIR, "users.db")
 
     def __new__(cls, *args, **kwargs):
         if not cls._instance:

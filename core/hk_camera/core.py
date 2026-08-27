@@ -50,6 +50,7 @@ class Camera(CameraToolsMixin, CameraIOMixin, CameraSettingMixin):
         self.device_parameters()
 
         # 启动读取线程, 异步读取
+        self._running = True
         self._thread = threading.Thread(target=self._read_thread)
         self._thread.daemon = True
         self._thread.start()
@@ -115,18 +116,30 @@ class Camera(CameraToolsMixin, CameraIOMixin, CameraSettingMixin):
 
     def close(self) -> None:
         """ close camera """
+        # 先停止读线程, 避免 close 后取帧报错导致空转
+        self._running = False
+        try:
+            self._camera.MV_CC_StopGrabbing()
+        except Exception:
+            pass
         return self._camera.MV_CC_CloseDevice()
 
     def _read_thread(self):
-        while True:
-            # time.sleep(0.1)
+        while self._running:
             try:
-                self._cache = self._read()
+                frame = self._read()
+                # _read() 返回的是复用缓冲区的视图, 必须拷贝一份,
+                # 否则下一帧会原地覆盖已被上层(显示/保存)持有的数据
+                self._cache = frame.copy()
             except CameraReadError as e:
-                pass
+                # 取帧失败(超时等)稍后重试, 不能无睡眠空转
+                if self._running:
+                    time.sleep(0.01)
             except Exception as e:
+                # 设备关闭等非预期异常: 未关闭则抛出, 已关闭则退出线程
+                if not self._running:
+                    break
                 raise e
-        # self._cache = _img#self._read()
 
     def width(self):
         return self._stFrameInfo.width

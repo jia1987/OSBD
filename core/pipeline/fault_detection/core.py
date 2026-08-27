@@ -66,62 +66,11 @@ def detect(img: np.ndarray) -> List[DetectOutput]:
 
     # 腐蚀膨胀
     feature = cv2.bitwise_or(canny_output.processed_residual, canny_output.processed_gxy)
-    # cv2.imshow('feature', gray)
 
+    kernel = np.ones((3, 3), np.uint8)
     for _ in range(10):
-        feature = cv2.erode(feature, np.ones((3, 3), np.uint8), iterations=1)
-        feature = cv2.dilate(feature, np.ones((3, 3), np.uint8), iterations=1)
-        #     feature = cv2.erode(feature, np.ones((32, 24), np.uint8), iterations=1)
-
-    # Step 1：去背景（保留局部差异）
-    # bg = cv2.GaussianBlur(feature, (1, 1), 0)
-    # feature = cv2.subtract(bg, feature)
-
-    clahe = cv2.createCLAHE(2.0, (8, 8))
-
-    # params = cv2.SimpleBlobDetector_Params()
-    # # 设置阈值范围
-    # params.minThreshold = 0
-    # params.maxThreshold = 255
-    # # 按面积筛选
-    # params.filterByArea = False
-    # params.minArea = 50
-    # # 按圆度筛选
-    # params.filterByCircularity = False
-    # # 创建检测器
-    # detector = cv2.SimpleBlobDetector_create(params)
-    # # 检测
-    # keypoints = detector.detect(feature)
-    # print(keypoints)
-    # 绘制
-    # out = cv2.drawKeypoints(feature, keypoints, None, (0, 0, 255),
-    #                         cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-
-    #kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (21, 21))
-    #tophat = cv2.morphologyEx(feature, cv2.MORPH_TOPHAT, kernel)
-    # feature_f = feature.astype(np.float32)
-    # mean = cv2.blur(feature_f, (15, 15))
-    # sqmean = cv2.blur(feature_f ** 2, (15, 15))** 0.5
-    # std = np.sqrt(sqmean - mean ).astype(np.uint8)
-
-
-    # cv2.imshow("blob", out)
-    # cv2.imshow("feature", feature)
-    # cv2.imshow("sqmean", sqmean.astype(np.uint8))
-    # cv2.imwrite("feature.jpg", feature)
-    # cv2.waitKey(0)
-    #
-    # feature = std
-    # feature = clahe.apply(feature)
-    # th2 = cv2.adaptiveThreshold(
-    #     feature,
-    #     255,
-    #     cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-    #     cv2.THRESH_BINARY,
-    #     11,
-    #     5
-    # )
-    # feature = th2
+        feature = cv2.erode(feature, kernel, iterations=1)
+        feature = cv2.dilate(feature, kernel, iterations=1)
 
     # 找轮廓(可能的缺陷)
     _, binary = cv2.threshold(feature, 75, 255, cv2.THRESH_BINARY)

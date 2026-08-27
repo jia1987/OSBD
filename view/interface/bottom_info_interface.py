@@ -72,7 +72,7 @@ class BottomInfoInterface(QWidget):
             camera_ctx = faultDetectionPipeline.CHANNELS[idx]
             label.setText(prefix + is_connect_title[faultDetectionPipeline.channels(ctx=camera_ctx).camera is not None])
         # whether connect with vsampler
-        self.vsamper_label.setText(self.tr('计米轮:') + is_connect_title[faultDetectionPipeline._vsampler is not None])
+        self.vsamper_label.setText(self.tr('计米轮:') + is_connect_title[faultDetectionPipeline.isVSamplerEnabled()])
         # length
         self.length_label.setText(
             self.tr('检测长度:') + '{:.2f}'.format(faultDetectionPipeline.accumulatedDistance()) + 'm')

@@ -5,7 +5,6 @@ import sys
 import threading
 import time
 from multiprocessing import shared_memory
-from os import times_result
 from typing import List,Iterable
 
 import numpy as np
@@ -18,9 +17,15 @@ from .mixin_prepare import PrepareMixin
 from .mixin_save import SaveMixin
 from .mixin_setting import SettingMixin
 from .mixin_vsampler import VSamplerMixin
+from ..config import config
 
 WRITE_FINISHED_FLAG = 0
 DETECT_FINISHED_FLAG = 1
+
+# worker 单次检测的最长等待时间, 超时按 worker 异常处理
+WORKER_TIMEOUT = 30
+# 放电缺陷的去抖窗口: 窗口内的连续事件合并, 窗口结束后立即允许下一次上报
+LIGHTNING_DEBOUNCE = 0.3
 
 
 class WorkerOutput():
@@ -28,18 +33,42 @@ class WorkerOutput():
         raise NotImplementedError()
 
 
+class WorkerCrashError(RuntimeError):
+    """ worker 子进程异常退出 / 超时 / 输出损坏 """
+
+
 work_cache = {}
+
+
+def _cleanup_work(entry):
+    """ 清理 work 缓存项: 杀掉子进程并释放共享内存 """
+    task, img_shm, op_shm, out_shm, _, _ = entry
+    try:
+        if task.poll() is None:
+            task.kill()
+    except Exception as e:
+        print(f'[System][Pipeline] 关闭 worker 进程失败: {e}')
+    for shm in (img_shm, op_shm, out_shm):
+        try:
+            shm.close()
+            shm.unlink()
+        except Exception:
+            pass
 
 
 def init_work(width, height, imgsize, ctx: str):
     """ 初始化一个 work"""
     if ctx in work_cache:
         task, img_shm, op_shm, out_shm, _width, _height = work_cache[ctx]
-        if _width == width and _height == height and img_shm.size == imgsize:
-            return img_shm, op_shm, out_shm
+        if task.poll() is None and _width == width and _height == height and img_shm.size == imgsize:
+            return img_shm, op_shm, out_shm, task
         else:
-            print('[System][Pipeline] 原 Worker 参数不匹配, 重新启动...')
-            task.kill()
+            if task.poll() is not None:
+                print(f'[System][Pipeline] Worker 进程已退出(code={task.returncode}), 重新启动...')
+            else:
+                print('[System][Pipeline] 原 Worker 参数不匹配, 重新启动...')
+            # 旧资源必须先释放, 否则 Windows 下句柄泄漏
+            _cleanup_work(work_cache.pop(ctx))
 
     # 共享内存
     print('[System][Pipeline] 分配共享内存.')
@@ -57,7 +86,7 @@ def init_work(width, height, imgsize, ctx: str):
         exe_path = [exe_path]
     else:
         # 开发环境
-        print('[System][Pipeline] 用户环境...')
+        print('[System][Pipeline] 开发环境...')
         print('[System][Pipeline] 解析器路径:', sys.executable)
         assert str(sys.executable).endswith('python.exe'), ''
         start_path = os.path.join(os.getcwd(), 'core', 'pipeline', 'detect_worker.py')
@@ -71,12 +100,12 @@ def init_work(width, height, imgsize, ctx: str):
                                         ],
                             creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
     work_cache[ctx] = (task, img_shm, op_shm, out_shm, width, height)
-    return img_shm, op_shm, out_shm
+    return img_shm, op_shm, out_shm, task
 
 
 def detect_by_work(img: np.ndarray, ctx) -> WorkerOutput:
     """ 使用 worker 进程 异步处理, 加快速度"""
-    img_shm, op_shm, out_shm = init_work(width=img.shape[1], height=img.shape[0], imgsize=img.nbytes, ctx=ctx)
+    img_shm, op_shm, out_shm, task = init_work(width=img.shape[1], height=img.shape[0], imgsize=img.nbytes, ctx=ctx)
 
     # 将 img 拷贝到共享内存
     b = np.ndarray(img.shape, dtype=img.dtype, buffer=img_shm.buf)
@@ -86,10 +115,18 @@ def detect_by_work(img: np.ndarray, ctx) -> WorkerOutput:
     op_shm.buf[WRITE_FINISHED_FLAG] = 1
 
     def wapper():
+        start = time.time()
         while op_shm.buf[DETECT_FINISHED_FLAG] != 1:
+            # worker 进程死亡检查: 否则主线程会永久挂起
+            if task.poll() is not None:
+                raise WorkerCrashError(f'worker 进程异常退出, 返回码: {task.returncode}')
+            if time.time() - start > WORKER_TIMEOUT:
+                raise WorkerCrashError(f'worker 检测超时({WORKER_TIMEOUT}s)')
             time.sleep(0.01)
         # 先获取数据大小, 然后读取数据
         data_length = int.from_bytes(out_shm.buf[-1024:], byteorder='big')
+        if data_length > len(out_shm.buf) - 1024:
+            raise WorkerCrashError(f'worker 输出数据越界: {data_length}')
         output: List[DetectOutput] = pickle.loads(out_shm.buf[:data_length])
 
         # reset
@@ -116,11 +153,21 @@ class FaultDetectionPipeline(SettingMixin, PrepareMixin, SaveMixin, VSamplerMixi
         self._process_time = None
         # 最后处理的缺陷
         self._last_faults = None
+        # 报警输出通道 (IO 卡物理通道 0~7)
+        self._warning_ch = int(config.get(config.IOCard_WarningChannel))
         # 报警重置的定时器 3s
         # 0 触发
-        self._warning_reset_lambda = lambda :self._io_card.setOutPutData(ch8=1)
+        self._warning_reset_lambda = lambda: self._io_card.setOutPutData(**{f'ch{self._warning_ch}': 1})
         self._warning_reset = None
         self.last_warning_time = None
+        # 报警持续时间(秒), 与文档保持一致
+        self.warning_duration = 3
+        # 连续缺陷时节流重新触发报警的间隔(秒): 等于报警持续时间,
+        # 使连续缺陷期间报警可以持续
+        self.warning_interval = 3
+        # 放电去抖状态
+        self._lightning_pending = False
+        self._lightning_next_time = 0.0
 
     def start(self):
         """ start detection pipeline """
@@ -165,10 +212,22 @@ class FaultDetectionPipeline(SettingMixin, PrepareMixin, SaveMixin, VSamplerMixi
                     self.channel_bus[k].clear()
                 else:
                     is_exist_fault = True
-                    worker[k] = detect_by_work(img, ctx=k)
                     self.channel_bus[k].detect_image = img
                     self.channel_bus[k].oringe_image = img
-            for k, output in worker.items(): self.channel_bus[k].faults = output.get()
+                    try:
+                        worker[k] = detect_by_work(img, ctx=k)
+                    except Exception as e:
+                        print(f'[System][Pipeline] 通道 {k} worker 提交失败: {e}, 跳过本帧')
+                        self.channel_bus[k].clear()
+                        self.channel_bus[k].detect_image = img
+                        self.channel_bus[k].oringe_image = img
+            for k, output in worker.items():
+                try:
+                    self.channel_bus[k].faults = output.get()
+                except WorkerCrashError as e:
+                    # worker 异常: 跳过本帧, 下一帧 init_work 会自动重建 worker
+                    print(f'[System][Pipeline] 通道 {k} 检测 worker 异常: {e}, 跳过本帧')
+                    self.channel_bus[k].clear()
             if is_exist_fault and self._callback is not None: self._callback()
 
             # save
@@ -190,20 +249,23 @@ class FaultDetectionPipeline(SettingMixin, PrepareMixin, SaveMixin, VSamplerMixi
 
 
         def detect_lightning():
-            # 读取结果
-            output = self.lightningOutput()
-            output.distance = self.accumulatedDistance(obj='batch')
+            # 读取结果: 原子地取走事件, 去抖窗口内的连续事件不会被丢弃,
+            # 而是等待窗口结束后立即上报, 也不阻塞主循环
+            if self.takeLightningEvent():
+                self._lightning_pending = True
             result = []
-            if output.fault:  # <--存在缺陷
+            now = time.time()
+            if self._lightning_pending and now >= self._lightning_next_time:
+                self._lightning_pending = False
+                self._lightning_next_time = now + LIGHTNING_DEBOUNCE
+                distance = self.accumulatedDistance(obj='batch')
+                self.markLightningReported(distance=distance, active=LIGHTNING_DEBOUNCE)
                 result.append(FaultInfo(camera='lightning',
                                         faults=[DetectOutput(0, 0, 0, 0, ftype='针孔缺陷')],
-                                        location=output.distance,
+                                        location=distance,
                                         batchName=self.batchName(),
                                         sampler="放电检测",
                                         worker=self.workerName()))
-                # sleep
-                time.sleep(0.3)
-                self.clearLightningOutput()
             return result
 
         while True:
@@ -224,9 +286,9 @@ class FaultDetectionPipeline(SettingMixin, PrepareMixin, SaveMixin, VSamplerMixi
             if len(result) != 0:
                 if self._warning_reset is not None and self._warning_reset.is_alive():
                     self._warning_reset.cancel()
-                if self.last_warning_time is None or (time.time() - self.last_warning_time) > 10:
-                    self._io_card.setOutPutData(ch8=0)
-                    self._warning_reset = threading.Timer(1, self._warning_reset_lambda)
+                if self.last_warning_time is None or (time.time() - self.last_warning_time) > self.warning_interval:
+                    self._io_card.setOutPutData(**{f'ch{self._warning_ch}': 0})
+                    self._warning_reset = threading.Timer(self.warning_duration, self._warning_reset_lambda)
                     self._warning_reset.start()
                     self.last_warning_time = time.time()
                 self.callback()()

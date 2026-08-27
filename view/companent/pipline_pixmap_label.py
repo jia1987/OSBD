@@ -2,7 +2,7 @@ import time, cv2, os, json
 import numpy as np
 from PyQt5.QtWidgets import QLabel, QFontDialog
 from PyQt5.QtGui import QPaintEvent, QPixmap, QPainter, QColor, QFontMetrics, QImage
-from PyQt5.QtCore import Qt, QRectF, QPointF, pyqtSignal, QPoint
+from PyQt5.QtCore import Qt, QRectF, QPointF, pyqtSignal, QPoint, QTimer
 from core import faultDetectionPipeline, ChannelInfo
 from core.pipeline import FaultInfo
 from core import utils
@@ -71,6 +71,15 @@ class PipelinePixmapLabelBase(QLabel):
         self._ctx = ctx
         super(PipelinePixmapLabelBase, self).__init__(parent)
         assert isinstance(ctx, str), 'It must be a string'
+        # 定时器驱动重绘(约30fps), 而不是在 paintEvent 里无条件 update()
+        # 造成以屏幕刷新率持续全量重绘
+        self._refresh_timer = QTimer(self)
+        self._refresh_timer.timeout.connect(self._onRefreshTimeout)
+        self._refresh_timer.start(33)
+
+    def _onRefreshTimeout(self):
+        if self.isVisible():
+            self.update()
 
     def paintEvent(self, event: QPaintEvent):
         super(PipelinePixmapLabelBase, self).paintEvent(event)
@@ -92,7 +101,6 @@ class PipelinePixmapLabelBase(QLabel):
             rect = mf.boundingRect(text)
             res = self.size() - rect.size()
             painter.drawText(res.width() // 2, res.height() // 2 + mf.ascent() + mf.descent(), text)
-        self.update()
 
     def ctx(self):
         return self._ctx
@@ -112,9 +120,10 @@ class PipelineCameraLabel(PipelinePixmapLabelBase):
         if info is None or info.camera is None:
             return False
         # 可能还没有采集到图像
+        # 只读取一次, 避免两次 read 之间帧被更新导致丢帧/不一致
         np_img = info.camera.read()
         if np_img is None: return False
-        image: QPixmap = utils.np_2_pixmap(arr=info.camera.read())
+        image: QPixmap = utils.np_2_pixmap(arr=np_img)
         # resize
         if image.size() != self.size():
             image: QPixmap = image.scaled(self.size(), Qt.KeepAspectRatio)
@@ -171,8 +180,9 @@ class ResultLabel(PipelinePixmapLabelBase):
     """ 图像识别结果 """
 
     def __init__(self, parent=None):
-        super(QLabel, self).__init__(parent)
+        super(ResultLabel, self).__init__(ctx='result', parent=parent)
         self._pixmap = None
+        self._faults = None
         self._font = getFont(12)
         self._fm = QFontMetrics(self._font)
         self._readPath = None
@@ -182,18 +192,27 @@ class ResultLabel(PipelinePixmapLabelBase):
     def setResult(self, path):
         # 可能不存在, 不存在则跳过
         self._readPath = path
-        if not os.path.exists(path):
-            self._pixmap = None
-        else:
-            self._pixmap = QPixmap(os.path.join(path, 'image.jpg'))
-            self._pixmap = PipelinePixmapLabelBase.apply_colormap_to_pixmap(pixmap=self._pixmap)
-            with open(os.path.join(path, 'fault.json'), 'r', encoding='utf-8') as f:
-                faults = json.load(f)
-                self._faults = FaultInfo.from_dict(**faults)
+        self._pixmap = None
+        self._faults = None
+        if path and os.path.exists(path):
+            image_path = os.path.join(path, 'image.jpg')
+            fault_path = os.path.join(path, 'fault.json')
+            if os.path.exists(image_path):
+                self._pixmap = QPixmap(image_path)
+                self._pixmap = PipelinePixmapLabelBase.apply_colormap_to_pixmap(pixmap=self._pixmap)
+            # fault.json 可能因断电等原因缺失或损坏, 不能直接打开
+            if os.path.exists(fault_path):
+                try:
+                    with open(fault_path, 'r', encoding='utf-8') as f:
+                        faults = json.load(f)
+                    self._faults = FaultInfo.from_dict(**faults)
+                except Exception as e:
+                    print(f'[System] 加载缺陷记录失败 {fault_path}: {e}')
         self.update()
 
     def paintEvent(self, event: QPaintEvent):
-        super(QLabel, self).paintEvent(event)
+        # 直接绘制缓存的结果图, 不走管线通道逻辑
+        QLabel.paintEvent(self, event)
         if self._pixmap is None:
             return
 
@@ -213,14 +232,17 @@ class ResultLabel(PipelinePixmapLabelBase):
         # draw
         painter.drawPixmap(offset, resized_image)
         painter.setPen(Qt.red)
-        for fault in self._faults.faults:
-            painter.drawRect(QRectF(offset.x() + fault.x * raito, offset.y() + fault.y * raito,
-                                    fault.w * raito, fault.h * raito))
-            painter.drawText(QPointF(offset.x() + fault.x * raito,
-                                     offset.y() + fault.y * raito - self._fm.descent() * 1.2),
-                             fault.ftype)
+        if self._faults is not None:
+            for fault in self._faults.faults:
+                painter.drawRect(QRectF(offset.x() + fault.x * raito, offset.y() + fault.y * raito,
+                                        fault.w * raito, fault.h * raito))
+                painter.drawText(QPointF(offset.x() + fault.x * raito,
+                                         offset.y() + fault.y * raito - self._fm.descent() * 1.2),
+                                 fault.ftype)
 
     def faultIn(self, pos: QPoint) -> int:
+        if self._faults is None:
+            return -1
         if self._offset is not None:
             pos = pos - self._offset
         ratio = 1 if (self._ratio is None) else self._ratio

@@ -64,6 +64,7 @@ class CameraMixin():
                 # inti camera
                 try:
                     camera = Camera(read_mode=config.get(config.Camera_ReadModes)[number],
+                                    capture=config.get(config.Camera_Captures)[number],
                                     img_path=config.get(config.Camera_Imgs)[number],
                                     video_path=config.get(config.Camera_Videos)[number],
                                     exposureTime=exposure,
@@ -106,7 +107,8 @@ class CameraMixin():
                 self.setLightGroup(*(modelconfig.exposureBatch[ctx] for ctx in PipelineType.CAMERA_LIST))
         else:
             print(f"[System] Disconnect Light Source...")
-            self._light_source.close()
+            if self._light_source is not None:
+                self._light_source.close()
             self._light_source = None
         # 同步到相机
         for number, camera in self._cameras.items():
@@ -128,7 +130,8 @@ class CameraMixin():
             for g in self._light_group:
                 chs = (0 in g, 1 in g, 2 in g, 3 in g)
                 chs = tuple(1 if not c else 0 for c in chs)
-                self._io_card.setOutPutData(*chs, *chs)
+                # 只写 ch0~ch3 四路光源触发, 避免覆盖 ch4~ch7 上的报警等输出
+                self._io_card.setOutPutData(*chs)
                 time.sleep(0.033333)
 
     def channels(self, ctx: str) -> ChannelInfo:

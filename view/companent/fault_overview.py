@@ -7,56 +7,6 @@ from core.pipeline import faultDetectionPipeline
 from typing import List, Set
 
 
-# class FaultLine(QWidget):
-#     """ 显示一根漆包线其中一个面上的缺陷所在点 """
-#
-#     def __init__(self, parent=None):
-#         super(FaultLine, self).__init__(parent)
-#         # 纯在缺陷的点
-#         self.fualt_point: Set[float] = set()
-#         self._scope = (0, 1)
-#         self.clear()
-#
-#     def setScope(self, minimum, maximum):
-#         """ 设置范围 """
-#         self._scope = (minimum, maximum)
-#
-#     def addPoint(self, point: float):
-#         """ 添加一个缺陷点"""
-#         self.fualt_point.add(point)
-#
-#     def clear(self):
-#         self.fualt_point.clear()
-#         self._scope = (0, 1)
-#
-#     def paintEvent(self, event):
-#         super(FaultLine, self).paintEvent(event)
-#         rect = self.rect()
-#         painter = QPainter(self)
-#         painter.setRenderHint(QPainter.Antialiasing)
-#
-#         pen = QPen(Qt.gray)
-#         pen.setWidth(self.height() // 8)
-#         pen.setCapStyle(Qt.RoundCap)
-#         painter.setPen(pen)
-#         painter.drawLine(self.height() // 8, rect.height() // 2, rect.width() - self.height() // 8, rect.height() // 2)
-#
-#         # =======================
-#         # 绘制缺陷点
-#         # =======================
-#         if len(self.fualt_point) > 0:
-#             rect = QRectF(0, self.height() * (1 / 2 - 1 / 4), 2, rect.height() / 2)
-#             painter.setPen(Qt.NoPen)
-#             painter.setBrush(Qt.red)
-#             _min, _max = self._scope
-#             _scope = _max - _min
-#             for point in self.fualt_point:
-#                 # 使用两个像素表示缺陷
-#                 point = (point - _min) / _scope * self.width()
-#                 rect.moveTo(point, rect.top())
-#                 painter.drawRoundedRect(rect, 1, 1)
-
-
 class FaultLine(QWidget):
     """显示一根漆包线其中一个面上的缺陷所在点（优化版）"""
 

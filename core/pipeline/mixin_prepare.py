@@ -16,8 +16,10 @@ class PrepareMixin():
 
             h, w = image.shape[:2]
             rectification = modelConfig.rectification.get(v)
+            # 未配置或配置为「不校正」(0,1,0,1) 时跳过处理
+            # 注意: 从 json 加载后是 list, 必须转 tuple 再比较
+            if rectification is None or tuple(rectification) == (0, 1, 0, 1): continue
             top_lower, top_upper, bottom_lower, bottom_upper = rectification
-            if rectification == (0, 1, 0, 1): continue
 
             # 透视变换
             # 原图上的四个点 (顺序很重要：左上, 右上, 左下, 右下)

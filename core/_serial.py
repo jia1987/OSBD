@@ -1,7 +1,9 @@
 import serial
-import serial
 import serial.tools.list_ports
 from dataclasses import dataclass
+
+# 串口默认读取超时(秒): 设备不响应时读取会返回而不是永久阻塞
+DEFAULT_TIMEOUT = 1
 
 
 @dataclass
@@ -19,10 +21,11 @@ class Serial():
         return ports_list
 
     @classmethod
-    def open(cls, port: str, baudrate: int) -> 'Serial':
+    def open(cls, port: str, baudrate: int, timeout: float = DEFAULT_TIMEOUT) -> 'Serial':
         _instance = cls()
         _instance.setSerial(serial=serial.Serial(port=port,
-                                                 baudrate=baudrate, ))
+                                                 baudrate=baudrate,
+                                                 timeout=timeout, ))
         return _instance
 
     @staticmethod
@@ -41,17 +44,16 @@ class Serial():
 
     def __init__(self):
         self._serial:serial.Serial = None
-        pass
 
     def setSerial(self, serial: serial.Serial) -> None:
         self._serial = serial
 
     def close(self):
-        self._serial.close()
-        return self._serial.close()
+        if self._serial is not None:
+            self._serial.close()
 
     def read(self):
         return self._serial.read()
 
     def isOpen(self) -> bool:
-        return self._serial.is_open
+        return self._serial is not None and self._serial.is_open

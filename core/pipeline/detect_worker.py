@@ -36,7 +36,8 @@ def get_args():
     return args
 
 
-USE_YOLO = True
+# 是否使用 YOLO 模型推理 (可用环境变量 OSBD_USE_YOLO=0 关闭, 回退传统算法)
+USE_YOLO = os.environ.get('OSBD_USE_YOLO', '1') not in ('0', 'false', 'False')
 if USE_YOLO and IS_INTEL:
     import openvino as ov
 def main():
@@ -82,7 +83,12 @@ def main():
             output = detect(img)
 
         # 回传
+        # 输出共享内存只有 64KiB, 结果序列化后超限时逐步裁剪, 防止写越界崩溃
+        max_len = len(out_shm.buf) - 1024
         data_bytes = pickle.dumps([o.to_dict() for o in output])
+        while len(data_bytes) > max_len and len(output) > 0:
+            output = output[:max(0, len(output) - max(1, len(output) // 4))]
+            data_bytes = pickle.dumps([o.to_dict() for o in output])
         out_shm.buf[:len(data_bytes)] = data_bytes
         # 传递数据大小
         data_length = len(data_bytes)

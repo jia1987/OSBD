@@ -83,12 +83,13 @@ class BatchNameWidget(EdgegWidget):
                                 '替换批次',
                                 f"不接受空本作为批次名称")
             return
-        if QMessageBox.question(self.window(),
-                                '替换批次',
-                                f"{self.PREX_BATCH}{faultDetectionPipeline.batchName() or ''} -> {self.batch_name_edit.text()}\n"
-                                f"{self.PREX_WORKER}{faultDetectionPipeline.workerName() or ''} -> {self.usersBox.currentText()}\n"
-                                f"替换后,新的缺陷信息将记录到新批次",
-                                QMessageBox.StandardButtons(QMessageBox.Yes | QMessageBox.No), ):
+        reply = QMessageBox.question(self.window(),
+                                     '替换批次',
+                                     f"{self.PREX_BATCH}{faultDetectionPipeline.batchName() or ''} -> {self.batch_name_edit.text()}\n"
+                                     f"{self.PREX_WORKER}{faultDetectionPipeline.workerName() or ''} -> {self.usersBox.currentText()}\n"
+                                     f"替换后,新的缺陷信息将记录到新批次",
+                                     QMessageBox.StandardButtons(QMessageBox.Yes | QMessageBox.No), )
+        if reply == QMessageBox.Yes:
             Function.swapBatch(batchName=self.batch_name_edit.text(), wokerName=self.usersBox.currentText())
             self.batch_name_edit.clear()
 
@@ -222,7 +223,7 @@ class ModelSettingWidget(EdgegWidget):
         # 是否已经存在
         config = os.path.join(MODEL_CONFIG_PATH, f'{string}.json')
         if os.path.exists(config):
-            reply = QMessageBox.warning(self, "创建型号配置", f"{string}已被占用", QMessageBox.No, QMessageBox.No)
+            QMessageBox.warning(self, "创建型号配置", f"{string}已被占用", QMessageBox.Ok)
             return
 
         # 创建
@@ -248,10 +249,11 @@ class ModelSettingWidget(EdgegWidget):
         """ 设置 型号配置 运用到管线中"""
         if self._model_config is None:
             return
-        if QMessageBox.question(self.window(),
-                                '设置型号配置',
-                                f"新的型号配置将会被保存，以及用于检测管线，请确保所有配置已经设置",
-                                QMessageBox.StandardButtons(QMessageBox.Yes | QMessageBox.No), ):
+        reply = QMessageBox.question(self.window(),
+                                     '设置型号配置',
+                                     f"新的型号配置将会被保存，以及用于检测管线，请确保所有配置已经设置",
+                                     QMessageBox.StandardButtons(QMessageBox.Yes | QMessageBox.No), )
+        if reply == QMessageBox.Yes:
             path = os.path.join(MODEL_CONFIG_PATH, f'{self.model_combo_box.currentText()}.json')
             self._model_config.save(path)
             faultDetectionPipeline.setModelConfig(path)

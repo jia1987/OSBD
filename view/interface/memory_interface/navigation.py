@@ -77,8 +77,16 @@ class Navigation(QWidget):
             read_dir = os.path.join(Path.OUTPUT_DIR, self._check_batch_name)
             items = os.listdir(read_dir)
             items = list(set(items))
-            items = sorted(items, key=lambda item: float(item))
+            # 目录名正常为距离数值, 但可能存在手工目录(如 temp), 不能直接 float()
+            items = sorted(items, key=self._distance_sort_key)
             self._update_list(list_view=self.result_list, items=items)
+
+    @staticmethod
+    def _distance_sort_key(item: str):
+        try:
+            return 0, float(item), item
+        except ValueError:
+            return 1, 0.0, item
 
 
     def _update_list(self, list_view, items):

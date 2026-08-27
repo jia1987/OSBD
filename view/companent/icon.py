@@ -36,21 +36,21 @@ class Icon(Enum):
             painter.drawPixmap(rect, icon.pixmap(QRectF(rect).toRect().size()))
 @cache
 def loadSvg(path):
+    # 缓存文件内容而不是 QFile 对象:
+    # QFile 被 close 后再读会得到空内容
     f = QFile(path)
     f.open(QFile.ReadOnly)
-    return f
+    data = bytes(f.readAll())
+    f.close()
+    return data
 
 def writeSvg(iconPath: str, indexes=None, **attributes):
     """ write svg with specified attributes """
     if not iconPath.lower().endswith('.svg'):
         return ""
 
-    f = loadSvg(path=iconPath)
-
     dom = QDomDocument()
-    dom.setContent(f.readAll())
-
-    f.close()
+    dom.setContent(loadSvg(path=iconPath))
 
     # change the color of each path
     pathNodes = dom.elementsByTagName('path')

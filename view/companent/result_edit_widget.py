@@ -77,7 +77,12 @@ class ResultEditWidget(QWidget):
 
     def eventFilter(self, obj, e):
         if e.type() == QEvent.MouseButtonRelease and obj is self.result_label:
+            # faultIn 返回 -1 表示没有命中任何缺陷, 不能选中
+            if self._faults is None:
+                return False
             i = self.result_label.faultIn(pos=e.pos())
+            if i < 0 or i >= len(self._faults.faults):
+                return False
             self._select_fault(fault=self._faults.faults[i])
         return False
 
@@ -99,7 +104,7 @@ class ResultEditWidget(QWidget):
 
     def _apply_change(self):
         """ apply change """
-        if self._current_fault is None: return
+        if self._current_fault is None or self._faults is None: return
 
         new_type = self.type_combo.currentText()
         self._current_fault.ftype = new_type

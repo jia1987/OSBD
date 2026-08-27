@@ -1,7 +1,5 @@
 import sys,os
 
-import core.const
-
 print(f"当前工作目录: {os.getcwd()}")
 print(f"EXE 文件位置: {sys.executable}")
 print(f"EXE 所在目录: {os.path.dirname(sys.executable)}")
@@ -10,8 +8,6 @@ IS_FROZEN = getattr(sys, 'frozen', False)
 import multiprocessing,logging
 multiprocessing.freeze_support()
 
-import sys
-import logging
 import traceback
 
 # 配置日志
@@ -65,38 +61,46 @@ if __name__ == '__main__':
     from PyQt5.QtWidgets import QApplication, QMessageBox
     app = QApplication(sys.argv)
 
+    # 注意: core 包的导入会创建检测管线单例(含硬件初始化),
+    # 必须放在 QApplication 创建之后
+    import core.const
+
     # ==========验证程序===========
     from core.utils.machine_id import get_machine_fingerprint, verify_license
     from core.const import Text
-    # with open('config/pub_key', 'rb') as f:
-    #     pub = f.read()
-    # with open('config/license', 'r') as f:
-    #     license = f.read()
-    # mid = get_machine_fingerprint(extra_salt=Text.APP_NAME)
-    # with open('config/mid', 'w', encoding='utf8') as f:
-    #     f.write(mid)
-    # ok, msg = verify_license(pub, license,extra_salt=Text.APP_NAME)
-    if True:
-        from view import Window
-
-        print("[System] init window...")
-        view = Window()
-        print("[System] load qss...")
-        # with open(os.path.join(core.const.Path.RC_DIR,'style','MaterialDark.qss'),'r',) as f:
-        #     qss = f.read()
-        # view.setStyleSheet(qss)
-        # start
-        from core import faultDetectionPipeline
-
-        faultDetectionPipeline.start()
-        view.show()
-        print("[System] show...")
-        sys.exit(app.exec_())
+    pub_key_path = os.path.join('config', 'pub_key')
+    license_path = os.path.join('config', 'license')
+    mid = get_machine_fingerprint(extra_salt=Text.APP_NAME)
+    if os.path.exists(pub_key_path) and os.path.exists(license_path):
+        with open(pub_key_path, 'rb') as f:
+            pub = f.read()
+        with open(license_path, 'r') as f:
+            license = f.read()
+        ok, msg = verify_license(pub, license, extra_salt=Text.APP_NAME)
+        if not ok:
+            QMessageBox.warning(None,
+                                "Error",
+                                f"验证失败:\n"
+                                f"  {msg}\n"
+                                f"机器码:{mid}",
+                                QMessageBox.Ok)
+            sys.exit(1)
     else:
-        # 验证失败
-        QMessageBox.warning(None,
-                            "Error",
-                            f"验证失败:\n"
-                            f"  {msg}\n"
-                            f"机器码:{mid}",
-                            QMessageBox.Ok)
+        # 未部署授权文件时允许继续运行(开发/验收环境)
+        logger.warning('未找到授权文件 (config/pub_key, config/license), 跳过授权校验')
+
+    from view import Window
+
+    print("[System] init window...")
+    view = Window()
+    print("[System] load qss...")
+    # with open(os.path.join(core.const.Path.RC_DIR,'style','MaterialDark.qss'),'r',) as f:
+    #     qss = f.read()
+    # view.setStyleSheet(qss)
+    # start
+    from core import faultDetectionPipeline
+
+    faultDetectionPipeline.start()
+    view.show()
+    print("[System] show...")
+    sys.exit(app.exec_())

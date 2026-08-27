@@ -69,28 +69,71 @@ class CameraAbstract():
 
 
 class CaptrueCamera(CameraAbstract):
+    """ 普通摄像头 (OpenCV VideoCapture) """
+
     def __init__(self, idx: int):
-        cap = cv2.Capture(idx)
+        cap = cv2.VideoCapture(idx)
 
         if not cap.isOpened():
-            raise OpencvCameraConnectError("摄像头path打开失败")
+            cap.release()
+            raise OpencvCameraConnectError(f"摄像头 {idx} 打开失败")
+        self._cap = cap
+
+    def read(self):
+        ret, frame = self._cap.read()
+        if not ret or frame is None:
+            raise OpencvCameraConnectError("摄像头读取帧失败")
+        if frame.ndim == 3:
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        return frame
+
+    def close(self):
+        if self._cap is not None:
+            self._cap.release()
+            self._cap = None
 
 
 class VedioCamera(CameraAbstract):
+    """ 视频文件输入 (演示/验收用) """
+
     def __init__(self, path: str):
         cap = cv2.VideoCapture()
         cap.open(path, cv2.CAP_FFMPEG)
 
         if not cap.isOpened():
-            raise OpencvCameraConnectError("摄像头path打开失败")
+            cap.release()
+            raise OpencvCameraConnectError(f"视频 {path} 打开失败")
+        self._cap = cap
+
+    def read(self):
+        ret, frame = self._cap.read()
+        if not ret or frame is None:
+            # 视频播放结束, 循环播放
+            self._cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+            ret, frame = self._cap.read()
+            if not ret or frame is None:
+                raise OpencvCameraConnectError("视频读取帧失败")
+        if frame.ndim == 3:
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        return frame
+
+    def close(self):
+        if self._cap is not None:
+            self._cap.release()
+            self._cap = None
 
 
 class ImageCamera(CameraAbstract):
+    """ 静态图片输入 (无硬件演示/验收用) """
+
     def __init__(self, path: str):
+        if not path or not os.path.exists(path):
+            raise OpencvCameraConnectError(f"图片不存在: {path}")
         data = np.fromfile(path, dtype=np.uint8)
         img = cv2.imdecode(data, cv2.IMREAD_COLOR)
+        if img is None:
+            raise OpencvCameraConnectError(f"图片解码失败: {path}")
         self._img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        cv2.imwrite(os.path.basename(path), self._img)
 
     def read(self):
         return self._img
@@ -98,8 +141,8 @@ class ImageCamera(CameraAbstract):
 
 class Camera():
     ReadMode_Hk = 'Mode_Hk'
-    ReadMode_Capture = 'ReadMode_Capture'
-    ReadMode_Vedio = 'ReadMode_OpenCV'
+    ReadMode_Capture = 'Mode_Capture'
+    ReadMode_Vedio = 'Mode_Vedio'
     ReadMode_Img = 'Mode_img'
 
     @classmethod
@@ -126,6 +169,8 @@ class Camera():
             self._capture = VedioCamera(path=video_path)
         elif read_mode == self.ReadMode_Img:
             self._capture = ImageCamera(path=img_path)
+        else:
+            raise OpencvCameraConnectError(f"未知的相机读取模式: {read_mode}")
 
     def read(self):
         """ get a frame"""

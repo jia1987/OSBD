@@ -40,10 +40,18 @@ class VSamplerSerial(Serial):
         while self.isOpen():
             with self._close_lock:
                 if not self.isOpen(): break
-                hex_list = self._write_and_read(tx=self.TX_VELOCITY, rx=self.RX_VELOCITY)
+                try:
+                    hex_list = self._write_and_read(tx=self.TX_VELOCITY, rx=self.RX_VELOCITY)
+                except Exception as e:
+                    print(f'[System][VSampler] 串口读取失败: {e}')
+                    time.sleep(0.1)
+                    continue
                 # Rx:01 03 02 02 7A (D8 C6)
                 # 校验位已删除
                 hex_list = hex_list[-4:-2]
+                # 设备不响应时读取超时, 数据不完整则跳过本轮
+                if len(hex_list) != 2:
+                    continue
                 self._frequency = self.hex2int(string=''.join(hex_list), bin=16, signed=True)
 
     def _write_and_read(self, tx: bytes, rx: int) -> List[str]:

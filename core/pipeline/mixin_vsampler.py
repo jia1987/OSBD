@@ -25,7 +25,8 @@ class VSamplerMixin():
             self._vsampler: VSamplerSerial = VSamplerSerial.open(baudrate=baudrate, port=port)
         else:
             print(f"[System] Disconnect VSampler...")
-            self._vsampler.close()
+            if self._vsampler is not None:
+                self._vsampler.close()
             self._vsampler = None
 
         self._is_vsampler_enabled = enabled
@@ -43,8 +44,8 @@ class VSamplerMixin():
                 self._accumulated_distance += v * timestep
                 # cache
                 self._v_last_timestep = v_now_time
-            # 30FPS
-            if (sleep_time := time.time() - st) < 1 / 30:
+            # 30FPS: 睡眠时间为 目标周期 - 本轮耗时
+            if (sleep_time := 1 / 30 - (time.time() - st)) > 0:
                 time.sleep(sleep_time)
 
     def velocity(self) -> float:
@@ -56,8 +57,8 @@ class VSamplerMixin():
         if self._vsampler is None:
             return 0.0
         # 编码器旋转速度 = 编码器角速度值 / 单圈分辨率 / 转速计算时间（单位：转 / 分钟）
-        # 采样时间 100ms
-        av = self._vsampler.frequency() / 32678 / 0.1 * 60
+        # 单圈分辨率 2^15 = 32768, 采样时间 100ms
+        av = self._vsampler.frequency() / 32768 / 0.1 * 60
         # conver 单位: 转 / 秒
         av = av / 60
         return av * (-1 if config.get(config.VSampler_Direction) else 1)

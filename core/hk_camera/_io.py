@@ -45,11 +45,12 @@ class CameraIOMixin(object):
             actual_height = stFrameInfo.nHeight
 
             if stFrameInfo.enPixelType == 17301505:  # RGB8
-                expected_size = actual_width * actual_height
-                if len(frame) != expected_size:
+                # RGB8 每像素 3 字节
+                expected_size = actual_width * actual_height * 3
+                if len(frame) < expected_size:
                     raise RuntimeError(f"数据大小不匹配: 期望 {expected_size}, 实际 {len(frame)}")
 
-                frame = frame.reshape((actual_height, actual_width))
+                frame = frame[:expected_size].reshape((actual_height, actual_width, 3))
             elif stFrameInfo.enPixelType == 17301514:  # Mono8
                 expected_size = actual_width * actual_height
                 if len(frame) != expected_size:

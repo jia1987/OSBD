@@ -15,3 +15,6 @@ PyQt5_sip==12.17.0
 pyserial==3.5
 ultralytics==8.4.31
 py-cpuinfo
+# Intel CPU 推理路径 (detect_worker 在 Intel 平台上需要), 安装较大可按需安装:
+# pip install openvino
+openvino>=2024.0
