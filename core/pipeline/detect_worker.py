@@ -63,7 +63,7 @@ def main():
         if USE_YOLO:
 
             img = np.repeat(img[:, :, np.newaxis], 3, axis=-1)
-            result = yolo(img,imgsz=imgsz, verbose=False)
+            result = yolo(img,imgsz=imgsz, verbose=False,conf=0.60)
             output = []
             boxes = result[0].boxes.xywh.cpu().numpy()  # 转为numpy数组
             boxes[:, 0] = boxes[:, 0] - boxes[:, 2] / 2

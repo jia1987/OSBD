@@ -78,6 +78,17 @@ class IOCard():
             string = int("".join([str(c) for c in chs]), 2)
         return string
 
+    @staticmethod
+    def to8bit(ch0: int = None, ch1: int = None, ch2: int = None, ch3: int = None,
+               ch4: int = None, ch5: int = None, ch6: int = None, ch7: int = None,
+               revise=False):
+        chs = (ch7, ch6, ch5, ch4, ch3, ch2, ch1, ch0)
+        if revise:
+            string = int("".join(['0' if c == 1 else '1' for c in chs]), 2)
+        else:
+            string = int("".join([str(c) for c in chs]), 2)
+        return string
+
     @classmethod
     def getCard(cls, number: int) -> 'IOCard':
         if number not in cls.__cards:
@@ -129,7 +140,8 @@ class IOCard():
         chs = (ch0, ch1, ch2, ch3, ch4, ch5, ch6, ch7, ch8, ch9, ch10, ch11, ch12, ch13, ch14, ch15)
         chs = [c1 if c2 is None else c2 for c1, c2 in zip(self._output_chs, chs)]
         self._output_chs = chs
-        string = self.to16bit(*chs, revise=True)
+        # string = self.to16bit(*chs, revise=True)
+        string = self.to8bit(*chs[:8], revise=True)
         ret = lib.WY_SetOutPutData(self._number, string)
         assert ret == 0, 'ret'
         return ret

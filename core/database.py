@@ -24,6 +24,15 @@ class Role(Enum):
             return "经理"
         elif self == Role.WORKER:
             return "工人"
+    @classmethod
+    def c2e(self,c):
+        if c == "管理员":
+            return Role.ADMIN.value
+        elif c == "经理":
+            return Role.MANAGER.value
+        elif c == "工人":
+            return Role.WORKER.value
+        raise NotImplementedError
 
 class Permission(Enum):
     CREATE_USER = "createUser"

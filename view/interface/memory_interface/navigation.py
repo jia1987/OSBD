@@ -9,7 +9,8 @@ from core.const import Path
 from core.database import UserManager
 from ...companent import Label, ListView
 
-
+from core.pipeline import FaultInfo
+import json
 class Navigation(QWidget):
     """ 显示保存的所有批次, 并可以选择缺陷点并展示"""
     faultLoadRequsted = pyqtSignal(str)
@@ -97,7 +98,24 @@ class Navigation(QWidget):
         """ 点击 """
         model: QStandardItemModel = self.batch_list.model()
         item = model.itemFromIndex(index)
+
         username = self._manager.getUsersByBatch(batchName=item.text())
+
+        batchp = os.path.join(Path.OUTPUT_DIR,  item.text())
+        a_fp = tuple(os.listdir(batchp))  # 0.0 0.1 0.3
+        if len(a_fp) != 0:
+            a_fp = a_fp[0]
+            # fault
+            a_f = tuple(os.listdir(os.path.join(batchp, a_fp)))
+            if len(a_f) != 0:
+                a_f = a_f[0]
+                fault_path = os.path.join(batchp, a_fp, a_f, 'fault.json')
+                if os.path.exists(fault_path):
+                    with open(fault_path, "r", encoding="utf-8") as f:
+                        fault = FaultInfo.from_dict(**json.load(f))
+                        username = fault.worker
+
+
 
         self.batch_label.setText(self.tr(self.BATCH_NAME_TAG) + ' ' + item.text())
         self.user_label.setText(self.tr(self.USER_NAME_TAG) + ' ' + (username or '无'))

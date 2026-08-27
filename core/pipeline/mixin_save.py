@@ -43,7 +43,7 @@ class SaveMixin():
 
 
             with open(os.path.join(save_path, f'fault.json'), 'w', encoding='utf-8') as f:
-                print(fault.to_dict())
+                # print(fault.to_dict())
                 json.dump(fault.to_dict(), f, ensure_ascii=False, indent=4)
 
             fault.saveImage(os.path.join(save_path, f'image.jpg'))
