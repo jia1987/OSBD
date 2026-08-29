@@ -11,7 +11,8 @@ from .companent import Panel, Icon, Label
 from .companent.title_bar import AppTitleBar
 from core.const import Path, Text
 
-from .interface import DetectionInterface, BottomInfoInterface, SettingInterface, MemoryhInterface, UserManagerInterface
+from .interface import DetectionInterface, BottomInfoInterface, SettingInterface, MemoryhInterface
+from .interface.system_interface import SystemInterface
 from .session import Session
 from .shutdown import release_devices
 
@@ -38,7 +39,7 @@ class Window(FramelessWindow):
         self.bottomInfoInterface = BottomInfoInterface(self)
         self.settingInterface = SettingInterface(self)
         self.memoryhInterface = MemoryhInterface(self)
-        self.userManagerInterface = UserManagerInterface(self)
+        self.systemInterface = SystemInterface(self)
 
         # stackedWidget
         self.stackedWidget = QStackedWidget(self)
@@ -51,7 +52,7 @@ class Window(FramelessWindow):
         self.settingBtn = self.panel.addButton(text=self.tr('设备设置'), icon=Icon.SETTING,
                                                onClicked=lambda: self.stackedWidget.setCurrentWidget(self.settingInterface))
         self.systemBtn = self.panel.addButton(text=self.tr('系统设置'), icon=Icon.DARABASE,
-                                              onClicked=lambda: self.stackedWidget.setCurrentWidget(self.userManagerInterface))
+                                              onClicked=lambda: self.stackedWidget.setCurrentWidget(self.systemInterface))
         # 权限: 工人隐藏 设备设置/系统设置
         if Session.is_worker_only:
             self.settingBtn.hide()
@@ -66,7 +67,7 @@ class Window(FramelessWindow):
         self.stackedWidget.addWidget(self.detectionInterface)
         self.stackedWidget.addWidget(self.memoryhInterface)
         self.stackedWidget.addWidget(self.settingInterface)
-        self.stackedWidget.addWidget(self.userManagerInterface)
+        self.stackedWidget.addWidget(self.systemInterface)
         self.stackedWidget.setCurrentWidget(self.detectionInterface)
         self.vlayout = QVBoxLayout()
         self.vlayout.setSpacing(0)

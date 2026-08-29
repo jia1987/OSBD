@@ -12,7 +12,7 @@ from core import ModelConfig
 from core import faultDetectionPipeline
 from core.const import Path
 from core.signal_bus import SignalBus
-from .affineTransform_window import AffineTransformWidget
+from ..system_interface.rectification_dialog import RectificationDialog
 from ..._global import Function
 from ...companent import Label, MaskBox, EdgegWidget, ComboBox, ToggleButton, PushButton, LineEdit, UsersComboBox
 
@@ -260,14 +260,9 @@ class ModelSettingWidget(EdgegWidget):
             self.now_model_label.setText(self.tr('当前配置:') + ' ' + self.model_combo_box.currentText())
 
     def _on_set_affineTransform_btn_clecked(self):
-        """ 点击事件 """
+        """ 点击事件: 打开升级版透视矫正弹窗 (画布拖拽4端点, 仅改内存) """
         if self._model_config is None: return
-        affineTransformWidget = AffineTransformWidget()
-        affineTransformWidget.setModelConfig(self._model_config)
-
-        w = MaskBox(parent=self.window())
-        w.setWidget(widget=affineTransformWidget)
-        w.exec()
+        RectificationDialog(self._model_config, self.window()).exec_()
 
 
 class BatchSettingWidget(EdgegWidget):
