@@ -23,6 +23,7 @@ class DetectOutput:
     w: int or float
     h: int or float
     ftype: str
+    conf: float = None  # 置信度(YOLO 输出时填充; 旧 fault.json 无此字段时为 None)
 
     def to_tuple(self):
         return (self.x,
@@ -36,7 +37,8 @@ class DetectOutput:
                 'y': self.y,
                 'w': self.w,
                 'h': self.h,
-                'ftype': self.ftype}
+                'ftype': self.ftype,
+                'conf': self.conf}
 
 
 def detect(img: np.ndarray) -> List[DetectOutput]:

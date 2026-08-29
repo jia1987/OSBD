@@ -78,9 +78,10 @@ class CameraMixin():
                 except Exception as e:
                     raise e
 
-                # 如果启动了光源控制器
-                # 将摄像头改为触发模式
-                camera.setTrigger(isTrigger=self._light_source is not None)
+                # 如果启动了光源控制器且该路配置为频闪, 将摄像头改为触发模式
+                triggers = config.get(config.Camera_Triggers) or [True] * 4
+                camera.setTrigger(isTrigger=(self._light_source is not None)
+                                          and bool(triggers[number]))
                 # camera.op.Set_trigger_mode(self._light_source is not None)
                 print(f"[System] {k}: Connect successfully...")
         else:
@@ -105,15 +106,20 @@ class CameraMixin():
             modelconfig = self.modelConfig()
             if modelconfig:
                 self.setLightGroup(*(modelconfig.exposureBatch[ctx] for ctx in PipelineType.CAMERA_LIST))
+            # 写入四路亮度(配置化)
+            for i, level in enumerate(self._light_levels):
+                self._light_source.setLightLevel(i + 1, level)
         else:
             print(f"[System] Disconnect Light Source...")
             if self._light_source is not None:
                 self._light_source.close()
             self._light_source = None
-        # 同步到相机
-        for number, camera in self._cameras.items():
+        # 同步到相机(按各路触发模式配置)
+        triggers = config.get(config.Camera_Triggers) or [True] * 4
+        for number, (name, camera) in enumerate(self._cameras.items()):
             if camera is None: continue
-            camera.setTrigger(isTrigger=self._light_source is not None)
+            camera.setTrigger(isTrigger=(self._light_source is not None)
+                                      and bool(triggers[number]))
 
     def setLightGroup(self, ch1: str, ch2: str, ch3: str, ch4: str) -> None:
         """ 自动优化批次, 让一次循环可以尽量多的光源 """

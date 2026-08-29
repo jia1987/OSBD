@@ -160,11 +160,15 @@ class FaultDetectionPipeline(SettingMixin, PrepareMixin, SaveMixin, VSamplerMixi
         self._warning_reset_lambda = lambda: self._io_card.setOutPutData(**{f'ch{self._warning_ch}': 1})
         self._warning_reset = None
         self.last_warning_time = None
-        # 报警持续时间(秒), 与文档保持一致
-        self.warning_duration = 3
+        # 报警持续时间(秒), 配置化(默认 3, 与历史行为一致)
+        self.warning_duration = int(config.get(config.IOCard_WarningDuration))
         # 连续缺陷时节流重新触发报警的间隔(秒): 等于报警持续时间,
         # 使连续缺陷期间报警可以持续
-        self.warning_interval = 3
+        self.warning_interval = int(config.get(config.IOCard_WarningInterval))
+        # 放电去抖窗口(秒), 配置化(默认 0.3)
+        self._lightning_debounce = float(config.get(config.Lightning_Debounce))
+        # 光源四路亮度(配置化)
+        self._light_levels = list(config.get(config.LightSource_Levels))
         # 放电去抖状态
         self._lightning_pending = False
         self._lightning_next_time = 0.0
@@ -223,11 +227,19 @@ class FaultDetectionPipeline(SettingMixin, PrepareMixin, SaveMixin, VSamplerMixi
                         self.channel_bus[k].oringe_image = img
             for k, output in worker.items():
                 try:
-                    self.channel_bus[k].faults = output.get()
+                    faults = output.get()
                 except WorkerCrashError as e:
                     # worker 异常: 跳过本帧, 下一帧 init_work 会自动重建 worker
                     print(f'[System][Pipeline] 通道 {k} 检测 worker 异常: {e}, 跳过本帧')
                     self.channel_bus[k].clear()
+                    continue
+                # 型号配置的缺陷类型过滤(未配置=不过滤, 与历史行为一致)
+                mc = self.modelConfig()
+                if mc is not None and mc.typeFilter:
+                    allowed = mc.typeFilter.get(k)
+                    if allowed is not None:
+                        faults = [f for f in faults if f.ftype in allowed]
+                self.channel_bus[k].faults = faults
             if is_exist_fault and self._callback is not None: self._callback()
 
             # save
@@ -257,9 +269,9 @@ class FaultDetectionPipeline(SettingMixin, PrepareMixin, SaveMixin, VSamplerMixi
             now = time.time()
             if self._lightning_pending and now >= self._lightning_next_time:
                 self._lightning_pending = False
-                self._lightning_next_time = now + LIGHTNING_DEBOUNCE
+                self._lightning_next_time = now + self._lightning_debounce
                 distance = self.accumulatedDistance(obj='batch')
-                self.markLightningReported(distance=distance, active=LIGHTNING_DEBOUNCE)
+                self.markLightningReported(distance=distance, active=self._lightning_debounce)
                 result.append(FaultInfo(camera='lightning',
                                         faults=[DetectOutput(0, 0, 0, 0, ftype='针孔缺陷')],
                                         location=distance,
@@ -344,6 +356,22 @@ class FaultDetectionPipeline(SettingMixin, PrepareMixin, SaveMixin, VSamplerMixi
 
     def lastFault(self)->Iterable[FaultInfo]:
         return self._last_faults
+
+    def setLightLevels(self, levels) -> None:
+        """ 设置四路光源亮度(0~255): 保存配置值, 光源已启用时逐路写入硬件 """
+        self._light_levels = [int(v) for v in levels]
+        if self._light_source is not None:
+            for i, level in enumerate(self._light_levels):
+                self._light_source.setLightLevel(i + 1, level)
+
+    def lightLevels(self) -> List[int]:
+        """ 当前四路光源亮度 """
+        return list(self._light_levels)
+
+    def resetDistance(self) -> None:
+        """ 累计距离清零(总里程与批次基线同时清零) """
+        self._accumulated_distance = 0
+        self._accumulatedDistance_for_batch = 0
 
 
 

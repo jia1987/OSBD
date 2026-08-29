@@ -1,15 +1,26 @@
 import numpy as np
 from typing import Dict
 from .meta import ModelConfig
+from ..config import config
 import cv2
 
-clahe = cv2.createCLAHE(
-    clipLimit=3.0,       # 对比度限制
-    tileGridSize=(8,8)   # 分块大小
-)
+_clahe_cache = {}
+
+
+def _get_clahe():
+    """ 按配置创建/复用 CLAHE (配置不变时复用同一实例) """
+    clip = float(config.get(config.Prepare_ClipLimit))
+    grid = int(config.get(config.Prepare_Grid))
+    key = (clip, grid)
+    if key not in _clahe_cache:
+        _clahe_cache[key] = cv2.createCLAHE(clipLimit=clip, tileGridSize=(grid, grid))
+    return _clahe_cache[key]
+
 
 class PrepareMixin():
     def prepare(self, images: Dict[str, np.ndarray], modelConfig: ModelConfig) -> None:
+        clahe = _get_clahe()
+        ratio = float(config.get(config.Prepare_RoiRatio))
         for v, image in images.items():
             # 空图片
             if image is None: continue
@@ -29,13 +40,11 @@ class PrepareMixin():
             new_width = max(top_upper - top_lower, bottom_upper - bottom_lower) * w
             pts2 = np.float32([[0, 0], [new_width, 0], [0, h], [new_width, h]])
 
-            # cv2.line(image, (int(top_lower * w), 0), (int(bottom_lower * w), h), (255, 0, 0), 2)
-            # cv2.line(image, (int(bottom_lower * w), 0), (int(bottom_upper * w), h), (255, 0, 0), 2)
-            # cv2.imwrite('results.jpg', image)
             # 计算透视变换矩阵
             M = cv2.getPerspectiveTransform(pts1, pts2)
             # 应用透视变换
             dst = cv2.warpPerspective(image, M, (int(new_width), h))
             # 直方图均衡
             enhanced = clahe.apply(dst)
-            images[v] = enhanced[int(h/3):int(2*h/3)]
+            # ROI 裁剪: 取中部 (ratio ~ 1-ratio), 默认 1/3 与历史行为一致
+            images[v] = enhanced[int(h * ratio):int(h * (1 - ratio))]

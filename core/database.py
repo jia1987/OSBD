@@ -81,6 +81,14 @@ class UserManager:
         )
         """)
 
+        # 旧库迁移: 补充 lastLogin / enabled 列 (已存在则忽略)
+        for ddl in ("ALTER TABLE users ADD COLUMN lastLogin TEXT",
+                    "ALTER TABLE users ADD COLUMN enabled INTEGER DEFAULT 1"):
+            try:
+                cursor.execute(ddl)
+            except sqlite3.OperationalError:
+                pass
+
         conn.commit()
         conn.close()
 
@@ -153,22 +161,30 @@ class UserManager:
         conn = sqlite3.connect(self.dbName)
         cursor = conn.cursor()
         cursor.execute("""
-        SELECT id, passwordHash, salt, role FROM users WHERE username = ?
+        SELECT id, passwordHash, salt, role, enabled FROM users WHERE username = ?
         """, (username,))
         user = cursor.fetchone()
-        conn.close()
 
         if not user:
+            conn.close()
             return False, "User not found"
 
-        userId, pwdHash, salt, roleStr = user
-        if self._verifyPassword(pwdHash, salt, password):
-            return True, {
-                "id": userId,
-                "username": username,
-                "role": Role(roleStr)
-            }
-        return False, "Wrong password"
+        userId, pwdHash, salt, roleStr, enabled = user
+        if not self._verifyPassword(pwdHash, salt, password):
+            conn.close()
+            return False, "Wrong password"
+        if enabled is not None and not enabled:
+            conn.close()
+            return False, "User disabled"
+        cursor.execute("UPDATE users SET lastLogin = ? WHERE id = ?",
+                       (datetime.datetime.now().isoformat(), userId))
+        conn.commit()
+        conn.close()
+        return True, {
+            "id": userId,
+            "username": username,
+            "role": Role(roleStr)
+        }
 
     # -----------------------
     # 创建用户
@@ -265,6 +281,64 @@ class UserManager:
         names = [u[0] for u in cursor.fetchall()]
         conn.close()
         return names
+
+    # -----------------------
+    # 用户管理 (UI 重构新增)
+    # -----------------------
+
+    def listUsers(self):
+        """ 全部用户信息列表 (用户管理页) """
+        conn = sqlite3.connect(self.dbName)
+        cursor = conn.cursor()
+        cursor.execute("""
+        SELECT id, username, role, createdAt, lastLogin, enabled FROM users ORDER BY id
+        """)
+        rows = cursor.fetchall()
+        conn.close()
+        return [{
+            "id": r[0],
+            "username": r[1],
+            "role": Role(r[2]),
+            "createdAt": r[3],
+            "lastLogin": r[4],
+            "enabled": bool(r[5]) if r[5] is not None else True,
+        } for r in rows]
+
+    def resetPassword(self, operatorRole, username, newPassword):
+        """ 重置指定用户密码 (需 CREATE_USER 权限) """
+        if not self._hasPermission(operatorRole, Permission.CREATE_USER):
+            return False, "Permission denied"
+        pwdHash, salt = self._hashPassword(newPassword)
+        conn = sqlite3.connect(self.dbName)
+        cursor = conn.cursor()
+        cursor.execute("UPDATE users SET passwordHash = ?, salt = ? WHERE username = ?",
+                       (pwdHash, salt, username))
+        changed = cursor.rowcount
+        conn.commit()
+        conn.close()
+        if changed == 0:
+            return False, "User not found"
+        return True, "Password reset"
+
+    def setUserEnabled(self, operatorRole, username, enabled: bool):
+        """ 启用/禁用用户 (需 CREATE_USER 权限; 不允许禁用管理员以防锁死系统) """
+        if not self._hasPermission(operatorRole, Permission.CREATE_USER):
+            return False, "Permission denied"
+        conn = sqlite3.connect(self.dbName)
+        cursor = conn.cursor()
+        cursor.execute("SELECT role FROM users WHERE username = ?", (username,))
+        row = cursor.fetchone()
+        if row is None:
+            conn.close()
+            return False, "User not found"
+        if not enabled and row[0] == Role.ADMIN.value:
+            conn.close()
+            return False, "Cannot disable admin"
+        cursor.execute("UPDATE users SET enabled = ? WHERE username = ?",
+                       (1 if enabled else 0, username))
+        conn.commit()
+        conn.close()
+        return True, "User enabled" if enabled else "User disabled"
 
     def getUsersByBatch(self, batchName):
         conn = sqlite3.connect(self.dbName)

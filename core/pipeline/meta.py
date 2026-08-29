@@ -79,6 +79,8 @@ class ModelConfig(object):
     mapper: Dict[str, int]
     enable: Dict[str, bool]
     exposureBatch: Dict[str, int]
+    # 每通道关注的缺陷类型 {ctx: [ftype...]}; None=不过滤(与历史行为一致)
+    typeFilter: Dict[str, List[str]] = None
 
     @classmethod
     def from_dict(cls, _dict):
@@ -96,6 +98,7 @@ class ModelConfig(object):
                                                       PipelineType.CAMERA_LIST[1]: 0,
                                                       PipelineType.CAMERA_LIST[2]: 0,
                                                       PipelineType.CAMERA_LIST[3]: 0}),
+            typeFilter=_dict.get('typeFilter', None),
         )
 
     @classmethod
@@ -109,9 +112,12 @@ class ModelConfig(object):
             json.dump(self.to_dict(), f, indent=4, ensure_ascii=False)
 
     def to_dict(self):
-        return {
+        d = {
             'rectification': self.rectification,
             'mapper': self.mapper,
             'enable': self.enable,
             "exposureBatch": self.exposureBatch
         }
+        if self.typeFilter is not None:
+            d['typeFilter'] = self.typeFilter
+        return d

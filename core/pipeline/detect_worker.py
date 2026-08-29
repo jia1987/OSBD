@@ -1,4 +1,4 @@
-import time, pickle
+import time, pickle, json
 import cv2, sys, os
 
 from fault_detection import detect, DetectOutput
@@ -36,8 +36,24 @@ def get_args():
     return args
 
 
-# 是否使用 YOLO 模型推理 (可用环境变量 OSBD_USE_YOLO=0 关闭, 回退传统算法)
-USE_YOLO = os.environ.get('OSBD_USE_YOLO', '1') not in ('0', 'false', 'False')
+def _load_detect_cfg():
+    """ 从 config/config.json 读取检测配置 (worker 为独立子进程, 直接解析 JSON 避免依赖导入路径) """
+    conf, use_yolo = 0.60, True
+    try:
+        with open(os.path.join(os.getcwd(), 'config', 'config.json'), encoding='utf-8') as f:
+            cfg = json.load(f).get('Detect', {})
+        conf = float(cfg.get('Conf', 0.60))
+        use_yolo = bool(cfg.get('UseYolo', True))
+    except Exception as e:
+        print(f'[System][Worker] 读取检测配置失败, 使用默认值: {e}')
+    return conf, use_yolo
+
+
+_cfg_conf, _cfg_yolo = _load_detect_cfg()
+# 是否使用 YOLO 模型推理 (环境变量 OSBD_USE_YOLO 优先, 否则取配置 Detect.UseYolo)
+_env_yolo = os.environ.get('OSBD_USE_YOLO')
+USE_YOLO = _cfg_yolo if _env_yolo is None else _env_yolo not in ('0', 'false', 'False')
+CONF = _cfg_conf
 if USE_YOLO and IS_INTEL:
     import openvino as ov
 def main():
@@ -64,7 +80,7 @@ def main():
         if USE_YOLO:
 
             img = np.repeat(img[:, :, np.newaxis], 3, axis=-1)
-            result = yolo(img,imgsz=imgsz, verbose=False,conf=0.60)
+            result = yolo(img,imgsz=imgsz, verbose=False,conf=CONF)
             output = []
             boxes = result[0].boxes.xywh.cpu().numpy()  # 转为numpy数组
             boxes[:, 0] = boxes[:, 0] - boxes[:, 2] / 2
@@ -78,7 +94,8 @@ def main():
                                            ftype=(FaultEnum.Bubble,
                                                   FaultEnum.Particle,
                                                   FaultEnum.Tumor,
-                                                  FaultEnum.Sticky_Line)[int(cls)], ))
+                                                  FaultEnum.Sticky_Line)[int(cls)],
+                                           conf=float(conf), ))
         else:
             output = detect(img)
 
