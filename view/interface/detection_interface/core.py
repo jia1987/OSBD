@@ -1,87 +1,50 @@
-from PyQt5.QtWidgets import QPushButton
+""" 实时检测页 (设计稿 P3): 顶部信息条 + 2×2 图像 + 底部泳道 | 右侧设备控制+统计+列表 """
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout
 
-from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QStackedWidget, QWidget, QMessageBox,QSplitter
-
-from .info import InfoWidget
-from .project_infomation import BatchInfomationWidget
-from .project_setter import BatchSettingWidget
-from .camera_display_interface import CameraDisplayInterface
-from .fault_overview import OnlineFaultOverview
-from .lightning_interface import LightnInterface
-from .enable_interface import EnableInterface
-from core.pipeline import faultDetectionPipeline, LightningSerialConnectError
-from ...companent.font import setFont
-from ...companent import Pivot
-from core.config import config
+from .top_infobar import TopInfoBar
+from .camera_grid import CameraGrid
+from .bottom_lanes import BottomLanes
+from .device_control import DeviceControlCard
+from .realtime_panel import RealtimePanel
 
 
 class DetectionInterface(QWidget):
-
     def __init__(self, parent=None):
         super(DetectionInterface, self).__init__(parent)
-        self.setObjectName("DetectionInterface")
 
         self.initWidget()
-        self.initConnect()
         self.initLayout()
 
     def initWidget(self):
-        # 当前批次的显示
-        self.faultOverview = OnlineFaultOverview(self)
-        # 摄像头的原始图像和处理结果可视化
-        self.cameraDisplayInterface = CameraDisplayInterface(parent=self)
-        # 放电检测的数据显示
-        self.lightnInterface = LightnInterface(parent=self)
-        # 设备的使能窗口
-        self.enableInterface = EnableInterface(parent=self)
+        self.topBar = TopInfoBar(self)
+        self.cameraGrid = CameraGrid(self)
+        self.bottomLanes = BottomLanes(self)
+        self.deviceControl = DeviceControlCard(self)
+        self.realtimePanel = RealtimePanel(self)
 
-        # info
-        self.infoWidget = InfoWidget(parent=self)
-
-        # 控制区域
-        self.panel = Pivot(parent=self)
-        self.w3 = QWidget(self)
-        self.stack = QStackedWidget(self)
-        self.batchSettingWidget = BatchSettingWidget(parent=self)
-        self.batchInfomationWidget = BatchInfomationWidget(parent=self)
-        self.stack.addWidget(self.batchSettingWidget)
-        self.stack.addWidget(self.batchInfomationWidget)
-        self.panel.addButton(text="设置", onClicked=lambda: self.stack.setCurrentWidget(self.batchSettingWidget))
-        self.panel.addButton(text="结果", onClicked=lambda: self.stack.setCurrentWidget(self.batchInfomationWidget))
-
-        # 分割
-        self.splitter = QSplitter(self)
-        self.splitter.setContentsMargins(0,0,0,0)
-
-    def initConnect(self):
-        pass
+        # 列表单击 → 通道图像高亮定位
+        self.realtimePanel.locate.connect(self.cameraGrid.flash)
 
     def initLayout(self):
-        self.w1= QWidget(self)
-        self.w2 = QWidget(self)
-        self.viewLayout = QHBoxLayout(self)
-        self.viewLayout.setContentsMargins(0, 0, 0, 0)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(12, 12, 12, 12)
+        outer.setSpacing(12)
 
-        self.vlayout = QVBoxLayout(self.w1)
-        self.hlayout1 = QHBoxLayout()
-        self.hlayout1.addWidget(self.faultOverview)
-        self.hlayout1.addWidget(self.lightnInterface)
-        self.vlayout.addLayout(self.hlayout1)
-        self.vlayout.addWidget(self.cameraDisplayInterface)
-        self.vlayout.addWidget(self.infoWidget)
-        self.hlayout1.setStretch(0, 3)
-        self.hlayout1.setStretch(1, 0)
-        self.vlayout.setStretch(0, 1)
-        self.vlayout.setStretch(1, 4)
+        outer.addWidget(self.topBar)
 
-        self.settinglLayout = QVBoxLayout(self.w2)
-        self.settinglLayout.addWidget(self.panel)
-        self.settinglLayout.addWidget(self.stack, 1)
-        self.settinglLayout.addWidget(self.enableInterface)
+        body = QHBoxLayout()
+        body.setSpacing(12)
 
-        self.viewLayout.addWidget(self.splitter)
-        self.splitter.addWidget(self.w1)
-        self.splitter.addWidget(self.w2)
-        self.splitter.setStretchFactor(0, 7)
-        self.splitter.setStretchFactor(1,3)
-        self.viewLayout.setStretch(0, 1)
+        left = QVBoxLayout()
+        left.setSpacing(12)
+        left.addWidget(self.cameraGrid, 1)
+        left.addWidget(self.bottomLanes)
+
+        right = QVBoxLayout()
+        right.setSpacing(12)
+        right.addWidget(self.deviceControl)
+        right.addWidget(self.realtimePanel, 1)
+
+        body.addLayout(left, 7)
+        body.addLayout(right, 3)
+        outer.addLayout(body, 1)
