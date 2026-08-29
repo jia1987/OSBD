@@ -1,9 +1,13 @@
+/* 深色主题表格 */
 QTableWidget, QTableView {
-    background-color: white;
+    background-color: #232733;
+    alternate-background-color: #1F2330;
+    border: 1px solid #3A4152;
     border-radius: 8px;
-    gridline-color: #E1E1E1;
-    selection-background-color: #0078D7;
-    selection-color: white;
+    gridline-color: #313949;
+    color: #E8EAF0;
+    selection-background-color: #2E486B;
+    selection-color: #FFFFFF;
 }
 
 QTableWidget::item, QTableView::item {
@@ -11,18 +15,20 @@ QTableWidget::item, QTableView::item {
 }
 
 QTableWidget::item:selected, QTableView::item:selected {
-    background-color: #0078D7;
-    color: white;
+    background-color: #2E486B;
+    color: #FFFFFF;
 }
 
 QTableWidget::item:hover, QTableView::item:hover {
-    background-color: #E5F1FB;
+    background-color: #2A3140;
 }
 
 QHeaderView::section {
-    background-color: #F3F3F3;
-    padding: 4px;
+    background-color: #2A2F3D;
+    color: #E8EAF0;
+    padding: 5px;
     border: none;
-    border-top-left-radius: 6px;
-    border-top-right-radius: 6px;
+    border-bottom: 1px solid #3A4152;
+    border-right: 1px solid #313949;
+    font-weight: bold;
 }

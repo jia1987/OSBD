@@ -3,6 +3,7 @@ from PyQt5.QtGui import QPixmap, QOpenGLShader, QPainter, QPen, QColor
 from PyQt5.QtCore import Qt, QTimer, QPoint, QPointF, QRectF, QLineF
 from .label import Label
 from .edge import EdgegWidget
+from ..common import Theme
 from core.pipeline import faultDetectionPipeline
 from typing import List, Set
 
@@ -10,10 +11,11 @@ from typing import List, Set
 class FaultLine(QWidget):
     """显示一根漆包线其中一个面上的缺陷所在点（优化版）"""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, tick_color: QColor = None):
         super(FaultLine, self).__init__(parent)
         self.fualt_point: Set[float] = set()
         self._scope = (0, 1)
+        self._tick_color = tick_color or QColor(Theme.RED)
 
         # ====== 优化缓存 ======
         self._points_px = []  # 归一化后的点（0~1）
@@ -86,9 +88,9 @@ class FaultLine(QWidget):
         painter = QPainter(pixmap)
         painter.setRenderHint(QPainter.Antialiasing)
 
-        # 画线
+        # 画线(深色主题基线)
         g = h // 8
-        pen = QPen(Qt.gray)
+        pen = QPen(QColor(Theme.BORDER))
         pen.setWidth(g)
         pen.setCapStyle(Qt.RoundCap)
         painter.setPen(pen)
@@ -102,7 +104,7 @@ class FaultLine(QWidget):
             # style: Qt.PenStyle = Qt.SolidLine,
             # cap: Qt.PenCapStyle = Qt.SquareCap,
             # join: Qt.PenJoinStyle = Qt.BevelJoin
-            painter.setPen(QPen(QColor(255, 0, 0), 2, Qt.SolidLine, Qt.RoundCap))
+            painter.setPen(QPen(self._tick_color, 2, Qt.SolidLine, Qt.RoundCap))
             y = h / 4
             w = w - g * 2
             lines = [QLineF(g + px * w, y,
@@ -140,7 +142,7 @@ class FaultOverview(EdgegWidget):
         self.top_line = FaultLine(self)
         self.right_line = FaultLine(self)
         self.bottom_line = FaultLine(self)
-        self.lightn_line = FaultLine(self)
+        self.lightn_line = FaultLine(self, tick_color=QColor(Theme.ORANGE))
         self.minimumLabel = Label(parent=self, fontSize=12)
         self.maximumLabel = Label(parent=self, fontSize=12)
 

@@ -1,10 +1,10 @@
+/* 深色主题列表 */
 QListWidget, QListView, QTreeView {
-    border: none;
+    border: 1px solid #3A4152;
     border-radius: 8px;
-    background-color: white;
+    background-color: #232733;
+    color: #E8EAF0;
     padding: 4px;
-
-    /* 取消整体焦点虚线 */
     outline: none;
 }
 
@@ -15,18 +15,16 @@ QTreeView::item {
     border-radius: 4px;
 }
 
-/* 选中状态（更淡蓝） */
 QListWidget::item:selected,
 QListView::item:selected,
 QTreeView::item:selected {
-    background-color: #D6EBFF;   /* 更淡蓝 */
-    color: black;                /* 文字不要白色，更柔和 */
-    outline: none;               /* 去虚线框 */
+    background-color: #2E486B;
+    color: #FFFFFF;
+    outline: none;
 }
 
-/* 鼠标悬停 */
 QListWidget::item:hover,
 QListView::item:hover,
 QTreeView::item:hover {
-    background-color: #F2F8FF;   /* 更浅 */
+    background-color: #2A3140;
 }

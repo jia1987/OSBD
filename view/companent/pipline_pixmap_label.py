@@ -1,12 +1,13 @@
 import time, cv2, os, json
 import numpy as np
 from PyQt5.QtWidgets import QLabel, QFontDialog
-from PyQt5.QtGui import QPaintEvent, QPixmap, QPainter, QColor, QFontMetrics, QImage
+from PyQt5.QtGui import QPaintEvent, QPixmap, QPainter, QColor, QFontMetrics, QImage, QPen
 from PyQt5.QtCore import Qt, QRectF, QPointF, pyqtSignal, QPoint, QTimer
 from core import faultDetectionPipeline, ChannelInfo
 from core.pipeline import FaultInfo
 from core import utils
 from .font import getFont
+from ..common import Theme
 from functools import lru_cache
 from PyQt5.QtGui import QColor
 
@@ -89,11 +90,13 @@ class PipelinePixmapLabelBase(QLabel):
         is_success = self._info_process(info=info)
 
         if not is_success:
+            # 深色主题无信号态: 暗红底 + 红色文案
             painter = QPainter(self)
             painter.setRenderHint(QPainter.Antialiasing)
-            painter.setBrush(Qt.red)
-            painter.setPen(Qt.white)
+            painter.setBrush(QColor('#3A1A1C'))
+            painter.setPen(QPen(QColor(Theme.RED)))
             painter.drawRect(self.rect())
+            painter.setPen(QColor(Theme.RED))
             font = getFont(24, True)
             painter.setFont(font)
             mf = QFontMetrics(font)

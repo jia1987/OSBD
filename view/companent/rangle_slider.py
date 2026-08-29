@@ -3,10 +3,7 @@ from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QPainter, QBrush, QColor
 import sys
 
-
-from PyQt5.QtWidgets import QWidget
-from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QPainter, QBrush, QColor
+from ..common import Theme
 
 
 class RangeSlider(QWidget):
@@ -78,9 +75,9 @@ class RangeSlider(QWidget):
         w, h = self.width(), self.height()
         bar_y = h // 2 - self._trackHeight // 2
 
-        # 背景轨道
+        # 背景轨道(深色主题)
         painter.setPen(Qt.NoPen)
-        painter.setBrush(QColor(220, 220, 220, 160))
+        painter.setBrush(QColor(Theme.BORDER))
         painter.drawRoundedRect(0, bar_y, w, self._trackHeight, 2, 2)
 
         # 位置
@@ -88,7 +85,7 @@ class RangeSlider(QWidget):
         upper_x = self._valueToPos(self._upperValue)
 
         # 选中区域
-        painter.setBrush(QColor(0, 120, 215))
+        painter.setBrush(QColor(Theme.ACCENT))
         painter.drawRoundedRect(lower_x, bar_y, upper_x - lower_x, self._trackHeight, 2, 2)
 
         # 画滑块
@@ -105,11 +102,11 @@ class RangeSlider(QWidget):
         painter.setBrush(QColor(0, 0, 0, 30))
         painter.drawEllipse(x - r, h // 2 - r, r * 2, r * 2)
 
-        # 颜色
+        # 颜色(深色主题)
         if active:
-            color = QColor(0, 120, 215)
+            color = QColor(Theme.ACCENT)
         elif hover:
-            color = QColor(240, 240, 240)
+            color = QColor('#BFE0FF')
         else:
             color = QColor(255, 255, 255)
 

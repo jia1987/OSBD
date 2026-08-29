@@ -23,9 +23,9 @@ class MaskDialogBase(QDialog):
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setGeometry(0, 0, parent.width(), parent.height())
 
-        c = 225
+        # 深色主题遮罩
         self.windowMask.resize(self.size())
-        self.windowMask.setStyleSheet(f'background:rgba({c}, {c}, {c}, 0.6)')
+        self.windowMask.setStyleSheet('background:rgba(10, 12, 16, 0.62)')
         self._hBoxLayout.addWidget(self.widget)
         self.setShadowEffect()
 

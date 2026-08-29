@@ -1,10 +1,16 @@
+/* 深色主题 LineEdit */
 QLineEdit {
-    border: 2px solid #E1E1E1;
+    border: 1px solid #3A4152;
     border-radius: 6px;
-    padding: 2px;
-    background-color: white;
+    padding: 3px 6px;
+    background-color: #2A2F3D;
+    color: #E8EAF0;
+    selection-background-color: #2E9BFF;
 }
 QLineEdit:focus {
-    border-color: #0078D7;
-    background-color: #F5FBFF;
+    border-color: #2E9BFF;
+    background-color: #262C3A;
+}
+QLineEdit:disabled {
+    color: #8B93A7;
 }

@@ -3,6 +3,8 @@ from PyQt5.QtCore import Qt, QPointF, QPropertyAnimation, pyqtProperty,pyqtSigna
 from PyQt5.QtGui import QColor, QPainter, QBrush, QPen
 import sys
 
+from ..common import Theme
+
 
 class ToggleButton(QWidget):
     clicked = pyqtSignal()
@@ -49,11 +51,11 @@ class ToggleButton(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
 
-        # 背景颜色
+        # 背景颜色(深色主题: 开=绿 关=深灰)
         if self._checked:
-            bg_color = QColor(76, 217, 100)  # iOS 绿色
+            bg_color = QColor(Theme.GREEN)
         else:
-            bg_color = QColor(180, 180, 180)  # 灰色
+            bg_color = QColor('#4A5162')
 
         painter.setBrush(QBrush(bg_color))
         painter.setPen(Qt.NoPen)

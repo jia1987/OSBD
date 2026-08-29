@@ -94,9 +94,8 @@ if __name__ == '__main__':
     print("[System] init window...")
     view = Window()
     print("[System] load qss...")
-    # with open(os.path.join(core.const.Path.RC_DIR,'style','MaterialDark.qss'),'r',) as f:
-    #     qss = f.read()
-    # view.setStyleSheet(qss)
+    with open(os.path.join(core.const.Path.RC_DIR, 'qss', 'dark.qss'), 'r', encoding='utf-8') as f:
+        app.setStyleSheet(f.read())
     # start
     from core import faultDetectionPipeline
 

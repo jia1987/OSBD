@@ -1,7 +1,7 @@
 from typing import Union
 
 from PyQt5.QtCore import Qt, pyqtSignal, QPoint
-from PyQt5.QtGui import QPaintEvent, QPainter, QPen
+from PyQt5.QtGui import QPaintEvent, QPainter, QPen, QColor
 from PyQt5.QtWidgets import QSpacerItem
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QSizePolicy
 
@@ -66,7 +66,7 @@ class Panel(QWidget):
         if self._now_btn is not None:
             geometry = self._now_btn.geometry()
             painter = QPainter(self)
-            pen = QPen(QPen(Theme.GrayColor, 2))
+            pen = QPen(QPen(QColor(Theme.ACCENT), 3))
             pen.setCapStyle(Qt.RoundCap)
             painter.setPen(pen)
             painter.drawLine(geometry.topLeft() + QPoint(-3, 0), geometry.bottomLeft() + QPoint(-3, 0))
