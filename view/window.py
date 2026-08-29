@@ -7,9 +7,11 @@ from PyQt5.QtCore import Qt
 
 from qframelesswindow import FramelessWindow
 
-from .companent import Panel, Icon, Label
+from .companent import Panel, Icon, Label, AlarmDialog
 from .companent.title_bar import AppTitleBar
 from core.const import Path, Text
+from core.config import config
+from core.signal_bus import SignalBus
 
 from .interface import DetectionInterface, BottomInfoInterface, SettingInterface, MemoryhInterface
 from .interface.system_interface import SystemInterface
@@ -83,6 +85,26 @@ class Window(FramelessWindow):
 
         # 提升到最顶层
         self.titleBar.raise_()
+
+        # 告警弹窗 (UI_AlarmPopup 开启时, 非模态 3s 自动关闭)
+        self._alarm_dialog = AlarmDialog(self)
+        SignalBus.faultUpdated.connect(self._on_fault_alarm)
+
+    def _on_fault_alarm(self):
+        if not config.get(config.UI_AlarmPopup):
+            return
+        from core import faultDetectionPipeline
+        last = faultDetectionPipeline.lastFault()
+        if not last:
+            return
+        lines = []
+        for fi in last:
+            if not fi.faults:
+                continue
+            types = ','.join(f.ftype for f in fi.faults)
+            lines.append(f'位置 {fi.location:.2f} m 处检出缺陷: {types} ({fi.sampler})')
+        if lines:
+            self._alarm_dialog.showAlarm('\n'.join(lines[:3]))
 
     def closeEvent(self, event):
         """ 统一处理所有退出路径 (标题栏关闭/Alt+F4/系统关机),

@@ -1,1 +1,0 @@
-from .core import UserManagerWidget as UserManagerInterface

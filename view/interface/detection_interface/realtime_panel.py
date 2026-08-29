@@ -10,7 +10,6 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QGridLayout, QTableView, QHea
 
 from ...companent import MaskBox, Label
 from ...companent.cards import StatCard
-from ...companent.result_edit_widget import ResultEditWidget
 from ...common import Theme
 from core import faultDetectionPipeline
 from core.const import Path
@@ -125,8 +124,9 @@ class RealtimePanel(QWidget):
         path = os.path.join(Path.OUTPUT_DIR, batch, distance, sampler)
         if not os.path.exists(path):
             return
+        from ..memory_interface.review_widget import ReviewWidget
         box = MaskBox(self.window())
-        edit = ResultEditWidget(parent=box)
-        edit.setResult(path)
-        box.setWidget(edit)
+        review = ReviewWidget(parent=box)
+        review.set_point(path, distance, sampler)
+        box.setWidget(review)
         box.exec_()

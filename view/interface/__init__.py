@@ -2,4 +2,3 @@ from .detection_interface import DetectionInterface
 from .bottom_info_interface import BottomInfoInterface
 from .setting_interface import SettingInterface
 from .memory_interface import MemoryhInterface
-from .datadabse import UserManagerInterface
