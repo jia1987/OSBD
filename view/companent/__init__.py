@@ -25,3 +25,5 @@ from .lanes import LanesOverview
 from .form_row import FormRow
 from .title_bar import AppTitleBar
 from .dialogs import LoginDialog, BatchSwitchDialog, AlarmDialog
+from .preview_dialog import PreviewDialog
+from .group_editor import GroupEditorDialog
