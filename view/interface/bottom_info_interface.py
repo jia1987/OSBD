@@ -1,11 +1,14 @@
-from ..companent import Label
+""" 底部设备状态栏 (设计稿): 8 个状态芯片 + 已检长度/线速/帧率/时钟
+保留历史类名与 300ms 刷新; 运行时间移入时钟 tooltip """
 from datetime import datetime
 
-from PyQt5.QtCore import QTimer
+from PyQt5.QtCore import QTimer, Qt
 from PyQt5.QtWidgets import QHBoxLayout, QWidget
 
 from core import faultDetectionPipeline
 from ..companent import Label
+from ..companent.status_chip import StatusChip
+from ..common import Theme
 
 
 def time_diff(start_time, end_time):
@@ -26,68 +29,68 @@ class BottomInfoInterface(QWidget):
     def __init__(self, parent=None):
         super(BottomInfoInterface, self).__init__(parent)
         self.setObjectName("BottomInfoInterface")
+        self.setFixedHeight(36)
         self.timer = QTimer(self)
         self.timer.timeout.connect(self._onTimeOut)
         self._startTime = datetime.now()
 
         self.initWidget()
         self.initLayout()
-        self.timer.start(300)  # 1000ms
+        self.timer.start(300)
 
         self._onTimeOut()
 
     def initWidget(self):
-        self.vsamper_label = Label(text='', fontSize=12, parent=self, )
-        self.camera_0_label = Label(text='', fontSize=12, parent=self, )
-        self.camera_1_label = Label(text='', fontSize=12, parent=self, )
-        self.camera_2_label = Label(text='', fontSize=12, parent=self, )
-        self.camera_3_label = Label(text='', fontSize=12, parent=self, )
-        self.run_time_label = Label(text='', fontSize=12, parent=self, )
-        self.length_label = Label(text='', fontSize=12, parent=self, )
-        self.time_label = Label(text='', fontSize=12, parent=self, )
+        self.camera_chips = [StatusChip(text='相机1', state='off', parent=self) for _ in range(4)]
+        self.light_chip = StatusChip(text='光源', state='off', parent=self)
+        self.vsampler_chip = StatusChip(text='计米轮', state='off', parent=self)
+        self.lightning_chip = StatusChip(text='放电', state='off', parent=self)
+        self.iocard_chip = StatusChip(text='IO卡', state='off', parent=self)
+
+        self.length_label = Label(text='', fontSize=12, parent=self)
+        self.length_label.setStyleSheet(f'color:{Theme.TEAL};font-weight:bold;background:transparent;')
+        self.velocity_label = Label(text='', fontSize=12, parent=self)
+        self.velocity_label.setStyleSheet(f'color:{Theme.TXT};background:transparent;')
+        self.fps_label = Label(text='', fontSize=12, parent=self)
+        self.fps_label.setStyleSheet(f'color:{Theme.TXT};background:transparent;')
+        self.time_label = Label(text='', fontSize=12, parent=self)
+        self.time_label.setStyleSheet(f'color:{Theme.TXT2};background:transparent;')
 
     def initLayout(self):
         self.viewLayout = QHBoxLayout(self)
-        self.viewLayout.setContentsMargins(0, 0, 0, 0)
-        self.viewLayout.setSpacing(32)
+        self.viewLayout.setContentsMargins(16, 0, 16, 0)
+        self.viewLayout.setSpacing(10)
 
-        self.viewLayout.addWidget(self.camera_0_label)
-        self.viewLayout.addWidget(self.camera_1_label)
-        self.viewLayout.addWidget(self.camera_2_label)
-        self.viewLayout.addWidget(self.camera_3_label)
-        self.viewLayout.addWidget(self.vsamper_label)
+        for chip in self.camera_chips:
+            self.viewLayout.addWidget(chip)
+        self.viewLayout.addWidget(self.light_chip)
+        self.viewLayout.addWidget(self.vsampler_chip)
+        self.viewLayout.addWidget(self.lightning_chip)
+        self.viewLayout.addWidget(self.iocard_chip)
+        self.viewLayout.addStretch(1)
         self.viewLayout.addWidget(self.length_label)
-        self.viewLayout.addWidget(self.run_time_label)
+        self.viewLayout.addWidget(self.velocity_label)
+        self.viewLayout.addWidget(self.fps_label)
         self.viewLayout.addWidget(self.time_label)
 
     def _onTimeOut(self):
-        # whether connect with camera
-        is_connect_title = {True: self.tr('已连接'), False: self.tr('未连接')}
-        for idx, (label, prefix) in enumerate((
-                (self.camera_0_label, self.tr('相机1:')),
-                (self.camera_1_label, self.tr('相机2:')),
-                (self.camera_2_label, self.tr('相机3:')),
-                (self.camera_3_label, self.tr('相机4:')),
-        )):
+        for idx, chip in enumerate(self.camera_chips):
             camera_ctx = faultDetectionPipeline.CHANNELS[idx]
-            label.setText(prefix + is_connect_title[faultDetectionPipeline.channels(ctx=camera_ctx).camera is not None])
-        # whether connect with vsampler
-        self.vsamper_label.setText(self.tr('计米轮:') + is_connect_title[faultDetectionPipeline.isVSamplerEnabled()])
-        # length
-        self.length_label.setText(
-            self.tr('检测长度:') + '{:.2f}'.format(faultDetectionPipeline.accumulatedDistance()) + 'm')
-        # time
-        d, h, m, s = time_diff(self._startTime, datetime.now())
-        self.run_time_label.setText(self.tr('运行时间:') + \
-                                    str(d) + self.tr('天') + \
-                                    str(h) + self.tr('时') + \
-                                    str(m) + self.tr('分') + \
-                                    str(s) + self.tr('秒'))
+            info = faultDetectionPipeline.channels(ctx=camera_ctx)
+            chip.setState('ok' if (info is not None and info.camera is not None) else 'err')
+        self.light_chip.setState('ok' if faultDetectionPipeline.isLightSourceEnabled() else 'off')
+        self.vsampler_chip.setState('ok' if faultDetectionPipeline.isVSamplerEnabled() else 'off')
+        self.lightning_chip.setState('ok' if faultDetectionPipeline.isLightningEnabled() else 'off')
+        io = faultDetectionPipeline.IOCard()
+        self.iocard_chip.setState('ok' if getattr(io, 'lib', None) is not None else 'err')
+
+        # 总里程 (历史行为: 底部栏用 obj='all')
+        self.length_label.setText(f'已检长度: {faultDetectionPipeline.accumulatedDistance():.2f} m')
+        self.velocity_label.setText(f'线速: {faultDetectionPipeline.velocity():.2f} m/s')
+        pt = faultDetectionPipeline.processTime()
+        self.fps_label.setText(f'帧率: {int(1 / pt)} FPS' if pt and pt > 0 else '帧率: -- FPS')
+
         now_time = datetime.now()
-        self.time_label.setText(self.tr('当地时间:') + \
-                                str(now_time.year) + self.tr('-') + \
-                                str(now_time.month) + self.tr('-') + \
-                                str(now_time.day) + self.tr(' ') + \
-                                str(now_time.hour) + self.tr('-') +
-                                str(now_time.minute) + self.tr('-') + \
-                                str(now_time.second))
+        self.time_label.setText(now_time.strftime('%Y-%m-%d %H:%M:%S'))
+        d, h, m, s = time_diff(self._startTime, now_time)
+        self.time_label.setToolTip(f'运行时间: {d}天{h}时{m}分{s}秒')

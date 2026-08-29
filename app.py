@@ -89,13 +89,30 @@ if __name__ == '__main__':
         # 未部署授权文件时允许继续运行(开发/验收环境)
         logger.warning('未找到授权文件 (config/pub_key, config/license), 跳过授权校验')
 
+    print("[System] load qss...")
+    with open(os.path.join(core.const.Path.RC_DIR, 'qss', 'dark.qss'), 'r', encoding='utf-8') as f:
+        app.setStyleSheet(f.read())
+
+    # ==========登录 (设计稿: 启动即登录; 记住我只存用户名) ==========
+    from PyQt5.QtWidgets import QDialog
+    from core.config import config
+    from view.companent.dialogs import LoginDialog
+    from view.session import Session
+    from view.shutdown import release_devices
+
+    remembered = config.get(config.Session_RememberUser) or ''
+    login = LoginDialog(remembered=remembered)
+    if login.exec_() != QDialog.Accepted:
+        release_devices()
+        sys.exit(0)
+    Session.set_user(login.user())
+    config.set(config.Session_RememberUser,
+               login.user()['username'] if login.remember() else '')
+
     from view import Window
 
     print("[System] init window...")
     view = Window()
-    print("[System] load qss...")
-    with open(os.path.join(core.const.Path.RC_DIR, 'qss', 'dark.qss'), 'r', encoding='utf-8') as f:
-        app.setStyleSheet(f.read())
     # start
     from core import faultDetectionPipeline
 
