@@ -8,6 +8,10 @@ QWidget {
 
 QLabel { background: transparent; border: none; }
 
+/* 自绘复合控件/自定义标签: 透明底, 避免 QWidget 全局底色在卡片上形成深色条块
+   (注意: 引擎对自定义子类不套用 QLabel 规则, 需按类名显式列出) */
+FormRow, StatusChip, ToggleButton, PanelButton, _IOLights, Label { background-color: transparent; }
+
 QFrame { background-color: #14161C; }
 
 QStackedWidget, QScrollArea { background-color: #14161C; }

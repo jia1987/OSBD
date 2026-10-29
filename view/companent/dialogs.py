@@ -66,7 +66,7 @@ class LoginDialog(QDialog):
         login_btn = QPushButton('登  录', self)
         login_btn.setFixedHeight(44)
         login_btn.setStyleSheet(
-            f'QPushButton{{background:{Theme.ACCENT};color:#FFFFFF;border:none;border-radius:8px;font-size:15px;font-weight:bold;}}'
+            f'QPushButton{{background:{Theme.ACCENT};color:#FFFFFF;border:none;border-radius:8px;font-size:17px;font-weight:bold;}}'
             f'QPushButton:hover{{background:#4AA8FF;}}'
             f'QPushButton:pressed{{background:#1F7ED6;}}')
         login_btn.clicked.connect(self._onLogin)
@@ -179,7 +179,7 @@ class AlarmDialog(QWidget):
         self._msg.setWordWrap(True)
         self._msg.setStyleSheet(
             f'background:{Theme.BG};border:2px solid {Theme.RED};border-radius:8px;'
-            f'color:{Theme.TXT};padding:14px 18px;font-size:13px;')
+            f'color:{Theme.TXT};padding:14px 18px;font-size:15px;')
         layout.addWidget(self._msg)
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)

@@ -16,11 +16,12 @@ _STATE_COLORS = {
 
 
 class StatusChip(QWidget):
-    def __init__(self, text: str = '', state: str = 'ok', parent=None):
+    def __init__(self, text: str = '', state: str = 'ok', parent=None, fixed_width: int = None):
         super(StatusChip, self).__init__(parent)
         self._text = text
         self._state = state
         self._font = getFont(12)
+        self._fixed_width = fixed_width
         self.setFixedHeight(26)
         self._update_width()
 
@@ -38,6 +39,9 @@ class StatusChip(QWidget):
         return self._state
 
     def _update_width(self):
+        if self._fixed_width:
+            self.setFixedWidth(self._fixed_width)
+            return
         from PyQt5.QtGui import QFontMetrics
         w = QFontMetrics(self._font).horizontalAdvance(self._text) + 36
         self.setFixedWidth(max(w, 60))

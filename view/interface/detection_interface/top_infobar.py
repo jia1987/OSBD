@@ -40,7 +40,7 @@ class TopInfoBar(QWidget):
         self._no_batch_tip.setStyleSheet(
             f'color:{Theme.YELLOW};background:#33290F;border:1px solid {Theme.YELLOW};'
             f'border-radius:6px;padding:4px 10px;')
-        layout.addWidget(self._no_batch_tip)
+        layout.addWidget(self._no_batch_tip, 0, Qt.AlignVCenter)
 
         self._switch_btn = PushButton(self, text='更换批次')
         self._switch_btn.setFixedHeight(32)

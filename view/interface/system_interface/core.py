@@ -2,7 +2,7 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QListWidget, QStackedWidget,
                              QPushButton)
 
-from ...companent import Card
+from ...companent import Card, Label
 from ...common import Theme
 from ...session import Session
 from core import faultDetectionPipeline

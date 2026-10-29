@@ -42,7 +42,7 @@ class ChannelImageCard(QWidget):
         self._seg = SegmentedControl(['原始图', '结果图'], header, active=1, item_width=72, height=26)
         h.addWidget(self._seg)
         self._zoom_btn = PushButton(header, text='放大')
-        self._zoom_btn.setFixedSize(52, 26)
+        self._zoom_btn.setFixedSize(62, 28)
         h.addWidget(self._zoom_btn)
         outer.addWidget(header)
 

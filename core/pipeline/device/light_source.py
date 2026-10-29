@@ -27,6 +27,9 @@ def commandTamplate(number: int, level: int, closeOther=False, closeFace=False, 
         command = ''.join([f'S{ch[i]}{target[i]:0>4}#' for i in range(4)])
     else:
         command = f'S{ch[number]}{level:0>4}#'
+        # 单路设置: 在原有状态基础上更新本路, 其余路保持不变
+        target = list(state)
+        target[number] = level
     return command.encode('utf8'), tuple(target)
 
 @lru_cache(maxsize=100)
@@ -81,7 +84,7 @@ class LightSourceSerial(Serial):
     def setLightLevel(self, number: int, level: int, closeOther=False, closeFace=False) -> None:
         """
         调整光源的亮度
-        :param number: 第几路光源
+        :param number: 光源通道索引(0~3, 对应 A/B/C/D)
         :param level:亮度
         :param closeOther:其他路型号自动关闭
         """

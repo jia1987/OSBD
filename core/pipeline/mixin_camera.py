@@ -108,7 +108,7 @@ class CameraMixin():
                 self.setLightGroup(*(modelconfig.exposureBatch[ctx] for ctx in PipelineType.CAMERA_LIST))
             # 写入四路亮度(配置化)
             for i, level in enumerate(self._light_levels):
-                self._light_source.setLightLevel(i + 1, level)
+                self._light_source.setLightLevel(i, level)
         else:
             print(f"[System] Disconnect Light Source...")
             if self._light_source is not None:

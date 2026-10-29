@@ -59,7 +59,15 @@ if IS_FROZEN:
 if __name__ == '__main__':
     print("[System] init app...")
     from PyQt5.QtWidgets import QApplication, QMessageBox
+    from PyQt5.QtGui import QFont
     app = QApplication(sys.argv)
+
+    # 应用级默认字体: 覆盖 QMessageBox/QInputDialog/菜单/提示等未显式设字体的原生控件
+    # (自绘组件统一走 view.companent.font.getFont, 两边字号保持同步放大)
+    _appFont = QFont()
+    _appFont.setFamilies(['Segoe UI', 'Microsoft YaHei', 'PingFang SC'])
+    _appFont.setPixelSize(15)
+    app.setFont(_appFont)
 
     # 注意: core 包的导入会创建检测管线单例(含硬件初始化),
     # 必须放在 QApplication 创建之后

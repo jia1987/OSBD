@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QGridLayout, QTableView, QHea
                              QMessageBox)
 
 from ...companent import MaskBox, Label
-from ...companent.cards import StatCard
+from ...companent.cards import Card, StatCard
 from ...common import Theme
 from core import faultDetectionPipeline
 from core.const import Path
@@ -29,6 +29,9 @@ class RealtimePanel(QWidget):
         layout.setSpacing(10)
 
         # ---- 统计卡 ----
+        stat_title = Label(text='实时缺陷统计', fontSize=14, weight=QFont.Bold)
+        stat_title.setStyleSheet(f'color:{Theme.TXT};background:transparent;')
+        layout.addWidget(stat_title)
         grid = QGridLayout()
         grid.setSpacing(8)
         self._stats = {}
@@ -38,10 +41,9 @@ class RealtimePanel(QWidget):
             grid.addWidget(card, i // 3, i % 3)
         layout.addLayout(grid)
 
-        # ---- 实时列表 ----
-        title = Label(text='实时缺陷列表', fontSize=14, weight=QFont.Bold)
-        title.setStyleSheet(f'color:{Theme.TXT};background:transparent;')
-        layout.addWidget(title)
+        # ---- 实时列表 (卡片容器) ----
+        self._list_card = Card('实时缺陷列表', self)
+        list_layout = self._list_card.contentLayout()
         self._model = QStandardItemModel(0, 5, self)
         self._model.setHorizontalHeaderLabels(['时间', '位置(m)', '通道', '类型', '置信'])
         self._table = QTableView(self)
@@ -55,11 +57,12 @@ class RealtimePanel(QWidget):
             hh.setSectionResizeMode(c, QHeaderView.ResizeToContents)
         self._table.clicked.connect(self._on_clicked)
         self._table.doubleClicked.connect(self._on_double_clicked)
-        layout.addWidget(self._table, 1)
+        list_layout.addWidget(self._table, 1)
 
         tip = Label(text='▲ 自动滚动 · 最新在上 · 单击定位 · 双击复判', fontSize=11)
         tip.setStyleSheet(f'color:{Theme.TXT2};background:transparent;')
-        layout.addWidget(tip)
+        list_layout.addWidget(tip)
+        layout.addWidget(self._list_card, 1)
 
         self._counts = {name: 0 for name, _ in STAT_TYPES}
         SignalBus.batchUpdated.connect(lambda *_: self._reset())

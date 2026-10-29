@@ -2,9 +2,9 @@
 沿用历史异常分支文案: 未设置串口/链接失败/初始化失败/摄像头初始化失败 """
 import serial.serialutil
 from PyQt5.QtCore import QTimer
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QGridLayout, QMessageBox
+from PyQt5.QtWidgets import QGridLayout, QMessageBox
 
-from ...companent import PushButton
+from ...companent import Card, PushButton
 from ...companent.device_toggle_card import DeviceToggleCard
 from ...common import Theme
 from core import faultDetectionPipeline
@@ -15,11 +15,10 @@ from core.pipeline.error import (VSamplerSerialConnectError,
                                  LightSourceControlerSerialConnectError)
 
 
-class DeviceControlCard(QWidget):
+class DeviceControlCard(Card):
     def __init__(self, parent=None):
-        super(DeviceControlCard, self).__init__(parent)
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 12, 12, 12)
+        super(DeviceControlCard, self).__init__('设备控制', parent)
+        layout = self.contentLayout()
         layout.setSpacing(10)
 
         # ---- 大启停按钮 ----
@@ -96,12 +95,12 @@ class DeviceControlCard(QWidget):
         if enabled:
             self.detectBtn.setText('■  停止检测  (点击关闭)')
             self.detectBtn.setStyleSheet(
-                f'PushButton, QPushButton{{background:{Theme.RED};color:#FFFFFF;border:none;border-radius:8px;font-size:16px;font-weight:bold;}}'
+                f'PushButton, QPushButton{{background:{Theme.RED};color:#FFFFFF;border:none;border-radius:8px;font-size:18px;font-weight:bold;}}'
                 f'QPushButton:hover{{background:#FF6B63;}}QPushButton:pressed{{background:#D6433C;}}')
         else:
             self.detectBtn.setText('▶  启动检测')
             self.detectBtn.setStyleSheet(
-                f'QPushButton{{background:{Theme.GREEN};color:#FFFFFF;border:none;border-radius:8px;font-size:16px;font-weight:bold;}}'
+                f'QPushButton{{background:{Theme.GREEN};color:#FFFFFF;border:none;border-radius:8px;font-size:18px;font-weight:bold;}}'
                 f'QPushButton:hover{{background:#43D07C;}}QPushButton:pressed{{background:#2AA35B;}}')
 
         self.cameraCard.setState(faultDetectionPipeline.isCameraEnabled(),

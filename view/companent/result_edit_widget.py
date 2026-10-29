@@ -19,7 +19,7 @@ from PyQt5.QtGui import QColor
 class ResultEditWidget(QWidget):
     """包含 ResultLabel + 缺陷编辑功能的完整控件"""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, vertical=False):
         super(ResultEditWidget, self).__init__(parent)
         self.closeBtn = PushButton(text=self.tr("退出"), parent=self)
         self.result_label = ResultLabel(self)
@@ -36,23 +36,26 @@ class ResultEditWidget(QWidget):
         self._current_fault = None
         self._faults: FaultInfo = None
 
-        # layout
-        right_layout = QVBoxLayout()
-        right_layout.addWidget(Label("Fault List"))
-        right_layout.addWidget(self.list_widget)
-        right_layout.addWidget(Label("Edit Type"))
-        right_layout.addWidget(self.type_combo)
-        right_layout.addWidget(self.btn_apply)
-        right_layout.addWidget(self.info_label)
-        right_layout.addStretch()
+        ctrl_layout = QVBoxLayout()
+        ctrl_layout.addWidget(self.closeBtn, 0, Qt.AlignRight)
+        ctrl_layout.addWidget(Label("缺陷列表"))
+        ctrl_layout.addWidget(self.list_widget, 1)
+        ctrl_layout.addWidget(Label("修改类型"))
+        ctrl_layout.addWidget(self.type_combo)
+        ctrl_layout.addWidget(self.btn_apply)
+        ctrl_layout.addWidget(self.info_label)
+        ctrl_layout.addStretch()
 
-        left_layout = QVBoxLayout()
-        left_layout.addWidget(self.closeBtn,0)
-        left_layout.addWidget(self.result_label,1)
-
-        main_layout = QHBoxLayout(self)
-        main_layout.addLayout(left_layout, 1)
-        main_layout.addLayout(right_layout, 3)
+        if vertical:
+            # 窄栏嵌入 (历史记录右栏): 图像在上, 列表/编辑在下
+            main_layout = QVBoxLayout(self)
+            main_layout.addWidget(self.result_label, 3)
+            main_layout.addLayout(ctrl_layout, 2)
+        else:
+            # 宽弹窗 (复判): 图像为主, 列表/编辑列为辅
+            main_layout = QHBoxLayout(self)
+            main_layout.addWidget(self.result_label, 3)
+            main_layout.addLayout(ctrl_layout, 1)
 
         # signals
         self.list_widget.itemClicked.connect(lambda item: self._select_fault(item.data(Qt.UserRole)))
@@ -96,7 +99,7 @@ class ResultEditWidget(QWidget):
         fault = self._current_fault
         if fault is not None:
             self.info_label.setText(
-                f"Selected: {fault.ftype} "
+                f"已选择: {fault.ftype} "
                 f"[{fault.x}, {fault.y}, {fault.w}, {fault.h}]"
             )
             self.info_label.update()

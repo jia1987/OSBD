@@ -56,10 +56,12 @@ class ReviewWidget(QWidget):
         self.info_label.setWordWrap(True)
         self.info_label.setStyleSheet(
             f'color:{Theme.TXT2};background:{Theme.CARD2};border:1px solid {Theme.BORDER};'
-            f'border-radius:6px;padding:8px;font-size:12px;')
+            f'border-radius:6px;padding:8px;font-size:14px;')
         layout.addWidget(self.info_label)
 
-        self.edit = ResultEditWidget(parent=content)
+        # 窄栏嵌入: 纵向排布, 隐藏"退出"(仅弹窗模式需要)
+        self.edit = ResultEditWidget(parent=content, vertical=True)
+        self.edit.closeBtn.hide()
         layout.addWidget(self.edit, 1)
 
         btn_row = QHBoxLayout()

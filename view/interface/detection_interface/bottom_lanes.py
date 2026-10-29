@@ -15,7 +15,7 @@ WINDOW = 50.0  # 滚动窗口: 最近 50m
 class BottomLanes(QWidget):
     def __init__(self, parent=None):
         super(BottomLanes, self).__init__(parent)
-        self.setFixedHeight(150)
+        self.setFixedHeight(175)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 8, 12, 6)
         layout.setSpacing(4)
@@ -27,7 +27,7 @@ class BottomLanes(QWidget):
         head.addWidget(title)
         head.addStretch(1)
         self._clear_btn = PushButton(self, text='清空显示')
-        self._clear_btn.setFixedSize(80, 24)
+        self._clear_btn.setFixedSize(92, 28)
         head.addWidget(self._clear_btn)
         layout.addLayout(head)
 

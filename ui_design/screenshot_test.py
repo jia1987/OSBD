@@ -62,7 +62,8 @@ def shot_dialogs():
     from view.companent.dialogs import BatchSwitchDialog
     d = BatchSwitchDialog(w)
     d.show()
-    QTimer.singleShot(500, lambda: (w.grab().save(os.path.join(OUT, 'dialog_更换批次.png')), d.close()))
+    # 抓弹窗自身 (grab 主窗口只会截到被遮罩的主界面)
+    QTimer.singleShot(500, lambda: (d.grab().save(os.path.join(OUT, 'dialog_更换批次.png')), d.close()))
 
 
 STEPS.append((t, shot_dialogs))

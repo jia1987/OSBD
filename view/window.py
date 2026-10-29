@@ -59,6 +59,7 @@ class Window(FramelessWindow):
         if Session.is_worker_only:
             self.settingBtn.hide()
             self.systemBtn.hide()
+        self.panel.addFooter('V2.0.0')
 
     def initLayout(self):
         self.viewLayout = QVBoxLayout(self)

@@ -41,7 +41,7 @@ class BottomInfoInterface(QWidget):
         self._onTimeOut()
 
     def initWidget(self):
-        self.camera_chips = [StatusChip(text='相机1', state='off', parent=self) for _ in range(4)]
+        self.camera_chips = [StatusChip(text=f'相机{i + 1}', state='off', parent=self) for i in range(4)]
         self.light_chip = StatusChip(text='光源', state='off', parent=self)
         self.vsampler_chip = StatusChip(text='计米轮', state='off', parent=self)
         self.lightning_chip = StatusChip(text='放电', state='off', parent=self)

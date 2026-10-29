@@ -5,7 +5,8 @@ import threading
 from PyQt5.QtCore import QTimer, Qt
 from PyQt5.QtGui import QColor, QPainter, QPen, QFont
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QComboBox,
-                             QSlider, QSpinBox, QDoubleSpinBox, QLabel, QMessageBox, QScrollArea)
+                             QSlider, QSpinBox, QDoubleSpinBox, QLabel, QMessageBox, QScrollArea,
+                             QSizePolicy)
 
 from ...companent import (Card, FormRow, Label, PushButton, StatusChip, ToggleButton,
                           SerialPortComboBox, FileLoadBox, SpinBox, DoubleSpinBox)
@@ -46,59 +47,68 @@ class _IOLights(QWidget):
             painter.drawEllipse(i * 24, 2, 16, 16)
 
 
-class CameraRow(QWidget):
-    def __init__(self, idx: int, parent=None):
-        super(CameraRow, self).__init__(parent)
+# 相机大表列宽 (表头与数据行共用同一 QGridLayout, 保证对齐)
+CAM_COLS = [('通道', 60), ('读取模式', 110), ('设备 / 信号源', 260), ('曝光(µs)', 90),
+            ('触发', 70), ('状态', 90), ('启用', 55), ('操作', 62)]
+
+
+class CameraRow:
+    """ 相机大表的一行: 控件直接放入共享 grid 的指定行 (与表头同列宽) """
+
+    def __init__(self, idx: int, grid: QGridLayout, row: int, parent=None):
         self._idx = idx
         self._syncing = False
-        layout = QGridLayout(self)
-        layout.setContentsMargins(8, 6, 8, 6)
-        layout.setSpacing(8)
 
-        layout.addWidget(Label(text=f'通道{idx + 1}', fontSize=13, weight=QFont.Bold), 0, 0)
+        ch = Label(text=f'通道{idx + 1}', fontSize=13, weight=QFont.Bold, parent=parent)
+        ch.setStyleSheet(f'color:{Theme.TXT};background:transparent;')
+        grid.addWidget(ch, row, 0)
 
-        self.modeCombo = QComboBox(self)
+        self.modeCombo = QComboBox(parent)
         self.modeCombo.addItems(READ_MODES)
+        self.modeCombo.setFixedWidth(CAM_COLS[1][1])
         self.modeCombo.currentIndexChanged.connect(self._on_mode_changed)
-        layout.addWidget(self.modeCombo, 0, 1)
+        grid.addWidget(self.modeCombo, row, 1)
 
         # 设备源 (按模式切换)
-        self.hkCombo = QComboBox(self)
+        self.hkCombo = QComboBox(parent)
         self.hkCombo.currentTextChanged.connect(self._on_hk_changed)
-        self.captureSpin = SpinBox(self)
+        self.captureSpin = SpinBox(parent)
         self.captureSpin.setRange(0, 16)
         self.captureSpin.valueChanged.connect(lambda v: set_list(config.Camera_Captures, idx, v))
-        self.videoBox = FileLoadBox(self, filter='Video Files (*.mp4 *.avi *.mov *.mkv)', title='选择视频')
+        self.videoBox = FileLoadBox(parent, filter='Video Files (*.mp4 *.avi *.mov *.mkv)', title='选择视频')
         self.videoBox.pathChanged.connect(lambda p: p and set_list(config.Camera_Videos, idx, p))
-        self.imgBox = FileLoadBox(self, filter='Images (*.png *.jpg *.jpeg)', title='选择图片')
+        self.imgBox = FileLoadBox(parent, filter='Images (*.png *.jpg *.jpeg)', title='选择图片')
         self.imgBox.pathChanged.connect(lambda p: p and set_list(config.Camera_Imgs, idx, p))
         self._src_wrap = QVBoxLayout()
         self._src_wrap.setContentsMargins(0, 0, 0, 0)
         for w in (self.hkCombo, self.captureSpin, self.videoBox, self.imgBox):
+            w.setSizePolicy(QSizePolicy.Expanding, w.sizePolicy().verticalPolicy())
             self._src_wrap.addWidget(w)
-        layout.addLayout(self._src_wrap, 0, 2)
+        grid.addLayout(self._src_wrap, row, 2)
 
-        self.exposureSpin = SpinBox(self)
+        self.exposureSpin = SpinBox(parent)
         self.exposureSpin.setRange(0, 65536)
+        self.exposureSpin.setFixedWidth(CAM_COLS[3][1])
         self.exposureSpin.valueChanged.connect(lambda v: set_list(config.Camera_Exposures, idx, v))
-        layout.addWidget(self.exposureSpin, 0, 3)
+        grid.addWidget(self.exposureSpin, row, 3)
 
-        self.triggerCombo = QComboBox(self)
+        self.triggerCombo = QComboBox(parent)
         self.triggerCombo.addItems(['频闪', '连续'])
+        self.triggerCombo.setFixedWidth(CAM_COLS[4][1])
         self.triggerCombo.currentIndexChanged.connect(self._on_trigger_changed)
-        layout.addWidget(self.triggerCombo, 0, 4)
+        grid.addWidget(self.triggerCombo, row, 4)
 
-        self.stateChip = StatusChip('未连接', 'err', self)
-        layout.addWidget(self.stateChip, 0, 5)
+        self.stateChip = StatusChip('未连接', 'err', parent, fixed_width=CAM_COLS[5][1])
+        grid.addWidget(self.stateChip, row, 5)
 
-        self.enableToggle = ToggleButton(self)
+        self.enableToggle = ToggleButton(parent)
         self.enableToggle.toogled.connect(self._on_enable_toggled)
-        layout.addWidget(self.enableToggle, 0, 6)
+        grid.addWidget(self.enableToggle, row, 6)
 
-        prev = PushButton(self, text='预览')
-        prev.setFixedSize(52, 26)
-        prev.clicked.connect(lambda: PreviewDialog(idx, self.window()).show())
-        layout.addWidget(prev, 0, 7)
+        prev = PushButton(parent, text='预览')
+        prev.setFixedSize(60, 28)
+        prev.clicked.connect(lambda: PreviewDialog(idx, prev.window()).show())
+        grid.addWidget(prev, row, 7)
 
         self._load_from_config()
 
@@ -217,20 +227,20 @@ class DeviceSettingPage(QWidget):
     # ================= 相机大卡 =================
     def _build_camera_card(self):
         card = Card('相机设置 (4 路检测通道)', self)
-        hdr = QHBoxLayout()
-        for text, w in [('通道', 60), ('读取模式', 110), ('设备 / 信号源', 260),
-                        ('曝光(µs)', 90), ('触发', 70), ('状态', 90), ('启用', 60), ('操作', 60)]:
+        # 表头与 4 行数据共用一个 grid: 列宽天然对齐
+        grid = QGridLayout()
+        grid.setContentsMargins(8, 6, 8, 6)
+        grid.setSpacing(8)
+        for col, (text, w) in enumerate(CAM_COLS):
             lab = Label(text=text, fontSize=12, weight=QFont.Bold)
-            lab.setFixedWidth(w)
             lab.setStyleSheet(f'color:{Theme.TXT2};background:transparent;')
-            hdr.addWidget(lab)
-        hdr.addStretch(1)
-        card.contentLayout().addLayout(hdr)
+            grid.addWidget(lab, 0, col)
+            grid.setColumnMinimumWidth(col, w)
+        grid.setColumnStretch(2, 1)  # 设备/信号源 列自适应拉伸
         self._camera_rows = []
         for i in range(4):
-            row = CameraRow(i, self)
-            self._camera_rows.append(row)
-            card.contentLayout().addWidget(row)
+            self._camera_rows.append(CameraRow(i, grid, i + 1, self))
+        card.contentLayout().addLayout(grid)
         tip = Label(text='支持模式: 海康威视(生产) / USB摄像头 / 视频文件(演示) / 静态图片(调试); '
                          '启用开关与曝光分组属于型号配置, 需在"型号/批次管理"中保存', fontSize=11)
         tip.setStyleSheet(f'color:{Theme.TXT2};background:transparent;')
@@ -288,7 +298,7 @@ class DeviceSettingPage(QWidget):
         self._group_label.setStyleSheet(f'color:{Theme.TEAL};background:transparent;')
         grp.addWidget(self._group_label, 1)
         edit_grp = PushButton(self, text='编辑分组')
-        edit_grp.setFixedSize(80, 26)
+        edit_grp.setFixedSize(92, 28)
         edit_grp.clicked.connect(self._edit_group)
         grp.addWidget(edit_grp)
         c.addLayout(grp)
@@ -337,7 +347,7 @@ class DeviceSettingPage(QWidget):
         self.vsam_dir.setChecked(bool(config.get(config.VSampler_Direction)))
         self.vsam_dir.toogled.connect(lambda on: config.set(config.VSampler_Direction, on))
         r4.setWidget(self.vsam_dir)
-        r4.addWidget(Label(text='反向', fontSize=12))
+        r4.setWidget(Label(text='反向', fontSize=12))
         c.addWidget(r4)
         self.vsam_info = QLabel()
         self.vsam_info.setStyleSheet(f'color:{Theme.TEAL};background:transparent;')
@@ -460,14 +470,14 @@ class DeviceSettingPage(QWidget):
     def _refresh(self):
         for row in self._camera_rows:
             row.refresh_state()
-        self.light_chip.setState('ok' if faultDetectionPipeline.isLightSourceEnabled() else 'off',
-                                 '已连接' if faultDetectionPipeline.isLightSourceEnabled() else '未启用')
-        self.vsam_chip.setState('ok' if faultDetectionPipeline.isVSamplerEnabled() else 'off',
-                                '已连接' if faultDetectionPipeline.isVSamplerEnabled() else '未启用')
-        self.lightning_chip.setState('ok' if faultDetectionPipeline.isLightningEnabled() else 'off',
-                                     '已启用' if faultDetectionPipeline.isLightningEnabled() else '未启用')
-        self.io_chip.setState('ok' if getattr(faultDetectionPipeline.IOCard(), 'lib', None) else 'err',
-                              '正常' if getattr(faultDetectionPipeline.IOCard(), 'lib', None) else '异常')
+        self.light_chip.setState('ok' if faultDetectionPipeline.isLightSourceEnabled() else 'off')
+        self.light_chip.setText('已连接' if faultDetectionPipeline.isLightSourceEnabled() else '未启用')
+        self.vsam_chip.setState('ok' if faultDetectionPipeline.isVSamplerEnabled() else 'off')
+        self.vsam_chip.setText('已连接' if faultDetectionPipeline.isVSamplerEnabled() else '未启用')
+        self.lightning_chip.setState('ok' if faultDetectionPipeline.isLightningEnabled() else 'off')
+        self.lightning_chip.setText('已启用' if faultDetectionPipeline.isLightningEnabled() else '未启用')
+        self.io_chip.setState('ok' if getattr(faultDetectionPipeline.IOCard(), 'lib', None) else 'err')
+        self.io_chip.setText('正常' if getattr(faultDetectionPipeline.IOCard(), 'lib', None) else '异常')
         self.vsam_info.setText(f'实时: 速度 {faultDetectionPipeline.velocity():.2f} m/s · '
                                f'累计 {faultDetectionPipeline.accumulatedDistance():.2f} m')
         mc = faultDetectionPipeline.modelConfig()

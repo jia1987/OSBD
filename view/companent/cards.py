@@ -57,7 +57,7 @@ class StatCard(QWidget):
 
     def __init__(self, num: str = '0', label: str = '', color: str = Theme.ACCENT, parent=None):
         super(StatCard, self).__init__(parent)
-        self.setFixedHeight(64)
+        self.setFixedHeight(72)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(4, 6, 4, 6)
         layout.setSpacing(2)
@@ -92,7 +92,7 @@ class KpiCard(QWidget):
     def __init__(self, label: str = '', value: str = '--', unit: str = '',
                  color: str = Theme.ACCENT, parent=None):
         super(KpiCard, self).__init__(parent)
-        self.setFixedHeight(52)
+        self.setFixedHeight(58)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 4, 8, 4)
         layout.setSpacing(0)

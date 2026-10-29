@@ -362,7 +362,7 @@ class FaultDetectionPipeline(SettingMixin, PrepareMixin, SaveMixin, VSamplerMixi
         self._light_levels = [int(v) for v in levels]
         if self._light_source is not None:
             for i, level in enumerate(self._light_levels):
-                self._light_source.setLightLevel(i + 1, level)
+                self._light_source.setLightLevel(i, level)
 
     def lightLevels(self) -> List[int]:
         """ 当前四路光源亮度 """

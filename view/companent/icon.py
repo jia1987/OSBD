@@ -28,7 +28,8 @@ class Icon(Enum):
         icon = self.path()
         if icon.endswith('.svg'):
             if attributes:
-                icon = writeSvg(self.value, indexes, **attributes).encode()
+                # writeSvg 需要完整路径 (传相对文件名时 loadSvg 读不到内容 → 图标空白)
+                icon = writeSvg(icon, indexes, **attributes).encode()
             drawSvgIcon(icon, painter, rect)
         else:
             icon = QIcon(self.toQIcon())
